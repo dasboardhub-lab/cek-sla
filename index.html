@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Modern Logistics Dashboard (Real-Time)</title>
+    <title>Executive Dashboard - Logistics Performance (Cloud Sync)</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -23,19 +23,11 @@
             color: #334155; 
         }
         
-        /* Smooth Scrollbar */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-        /* Custom Styles */
-        .glass-panel {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.5);
-        }
-        
         .card-hoverable {
             transition: all 0.3s ease;
         }
@@ -44,7 +36,6 @@
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
         }
 
-        /* Input Styling */
         .input-modern {
             background-color: #f1f5f9;
             border: 1px solid transparent;
@@ -56,7 +47,6 @@
             box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
         }
 
-        /* Note Input Animation */
         .note-input {
             transition: border-color 0.3s, background-color 0.3s;
         }
@@ -64,17 +54,23 @@
             border-color: #10b981 !important;
             background-color: #ecfdf5 !important;
         }
-        .note-loading {
-            opacity: 0.5;
+        
+        .upload-loading {
             pointer-events: none;
+            opacity: 0.7;
+            background-color: #f1f5f9;
+            cursor: wait !important;
         }
 
-        /* Status Indicator for Firebase */
-        #firebaseStatus {
-            transition: all 0.3s ease;
+        /* Status Indicator */
+        .status-dot {
+            height: 8px; width: 8px; border-radius: 50%; display: inline-block;
         }
-        .status-online { background-color: #10b981; }
+        .status-online { background-color: #10b981; box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2); }
         .status-offline { background-color: #ef4444; }
+        .status-syncing { background-color: #f59e0b; animation: pulse 1s infinite; }
+
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
         @media print {
             .no-print { display: none !important; }
@@ -95,19 +91,19 @@
                     </div>
                     <div>
                         <h1 class="text-lg font-bold text-slate-800 leading-tight">Logistics Ops</h1>
-                        <p class="text-xs text-slate-500 font-medium flex items-center gap-2">
-                            Dashboard & Real-time Notes
-                            <span class="flex items-center gap-1 text-[10px] bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
-                                <span id="firebaseStatus" class="w-2 h-2 rounded-full status-offline"></span>
-                                <span id="firebaseStatusText">Connecting...</span>
+                        <div class="text-xs text-slate-500 font-medium flex items-center gap-2">
+                            Cloud Dashboard
+                            <span class="flex items-center gap-1.5 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+                                <span id="syncStatusDot" class="status-dot status-offline"></span>
+                                <span id="syncStatusText" class="text-[10px] font-bold text-slate-600">Connecting...</span>
                             </span>
-                        </p>
+                        </div>
                     </div>
                 </div>
                 <div class="hidden md:flex items-center gap-4">
                     <div class="text-right">
                         <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Last Updated</p>
-                        <p class="text-sm font-semibold text-slate-700" id="currentDate">loading...</p>
+                        <p class="text-sm font-semibold text-slate-700" id="lastUpdatedDisplay">-</p>
                     </div>
                     <div class="h-8 w-px bg-slate-200"></div>
                     <button onclick="window.print()" class="text-slate-500 hover:text-indigo-600 transition p-2 rounded-lg hover:bg-indigo-50">
@@ -127,16 +123,23 @@
                     
                     <!-- Upload -->
                     <div class="w-full lg:w-1/3">
-                        <label class="block text-xs font-bold text-indigo-600 uppercase tracking-wider mb-2">
-                            <i class="fas fa-database mr-1"></i> Upload Data (CSV)
-                        </label>
-                        <label class="flex flex-col w-full h-14 border-2 border-dashed border-slate-300 rounded-xl hover:bg-indigo-50 hover:border-indigo-300 transition cursor-pointer group items-center justify-center relative">
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="block text-xs font-bold text-indigo-600 uppercase tracking-wider">
+                                <i class="fas fa-cloud-upload-alt mr-1"></i> Update Data (Global)
+                            </label>
+                            <!-- Hidden File Input triggered by label -->
+                        </div>
+                        <label id="dropZone" class="flex flex-col w-full h-14 border-2 border-dashed border-slate-300 rounded-xl hover:bg-indigo-50 hover:border-indigo-300 transition cursor-pointer group items-center justify-center relative bg-white">
                             <div class="flex items-center gap-2 text-slate-400 group-hover:text-indigo-600 transition">
-                                <i class="fas fa-cloud-upload-alt"></i>
-                                <span class="text-sm font-medium">Klik untuk upload file CSV</span>
+                                <i class="fas fa-file-csv fa-lg"></i>
+                                <span class="text-sm font-medium" id="uploadText">Upload CSV (Append Mode)</span>
                             </div>
                             <input type="file" id="csvUpload" accept=".csv" class="opacity-0 absolute inset-0 cursor-pointer" />
                         </label>
+                        <p class="text-[10px] text-slate-500 mt-1 ml-1 font-medium flex items-center">
+                            <i class="fas fa-info-circle mr-1 text-blue-500"></i>
+                            Validasi unik berdasarkan kolom "No Bagseals".
+                        </p>
                     </div>
 
                     <!-- Filters -->
@@ -307,7 +310,7 @@
                             <th class="px-6 py-4">Vendor</th>
                             <th class="px-6 py-4">Destinasi</th>
                             <th class="px-6 py-4 w-[250px] bg-yellow-50 text-yellow-700 border-l border-yellow-100">
-                                <i class="fas fa-edit mr-1"></i> Catatan Lapangan
+                                <i class="fas fa-edit mr-1"></i> Catatan Lapangan (Live)
                             </th>
                         </tr>
                     </thead>
@@ -320,13 +323,13 @@
 
     </main>
 
-    <!-- FIREBASE & APP SCRIPT -->
+    <!-- FIREBASE MODULE -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, doc, setDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
-        // CONFIG USER
+        // CONFIG
         const firebaseConfig = {
             apiKey: "AIzaSyAxpxGSwq9iTeDBNqW1pZMOTu_-KGt6iK4",
             authDomain: "logsheet-5r.firebaseapp.com",
@@ -336,67 +339,163 @@
             appId: "1:358725557740:web:c3493a376e2f70711ff4c9"
         };
 
-        // INIT FIREBASE
-        let app, db, auth;
-        let globalNotes = {}; // Store notes locally for fast render
+        const APP_ID = 'logsheet_dashboard_v1';
+        
+        let db;
 
+        // INIT
         try {
-            app = initializeApp(firebaseConfig);
+            const app = initializeApp(firebaseConfig);
             db = getFirestore(app);
-            auth = getAuth(app);
-            console.log("Firebase Initialized");
+            const auth = getAuth(app);
+
+            // AUTH
+            signInAnonymously(auth).then(() => {
+                updateStatus('online', 'Connected');
+                initListeners();
+            }).catch(e => {
+                console.error(e);
+                updateStatus('offline', 'Auth Failed');
+            });
+
         } catch(e) {
-            console.error("Firebase Init Error:", e);
-            document.getElementById('firebaseStatusText').innerText = "Config Error";
+            console.error(e);
+            updateStatus('offline', 'Config Error');
         }
 
-        // AUTH & LISTEN
-        if(auth) {
-            signInAnonymously(auth).then(() => {
-                document.getElementById('firebaseStatus').classList.remove('status-offline');
-                document.getElementById('firebaseStatus').classList.add('status-online');
-                document.getElementById('firebaseStatusText').innerText = "Connected";
+        function updateStatus(state, text) {
+            const dot = document.getElementById('syncStatusDot');
+            const txt = document.getElementById('syncStatusText');
+            if(dot && txt) {
+                dot.className = `status-dot status-${state}`;
+                txt.innerText = text;
+            }
+        }
 
-                // Listen to Notes Collection
-                const notesCol = collection(db, 'field_notes');
-                onSnapshot(notesCol, (snapshot) => {
-                    snapshot.docChanges().forEach((change) => {
-                        const data = change.doc.data();
-                        const key = change.doc.id;
-                        globalNotes[key] = data.text; // Update local store
-
-                        // Update UI if element exists
-                        const el = document.getElementById(`note-${key}`);
-                        if (el && el.value !== data.text && document.activeElement !== el) {
-                            el.value = data.text;
-                            el.classList.add('bg-green-50'); 
-                            setTimeout(()=>el.classList.remove('bg-green-50'), 1000);
+        // --- LISTENERS ---
+        function initListeners() {
+            // 1. Listen for Main Data Changes
+            const mainDataRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'main_dataset', 'current');
+            
+            onSnapshot(mainDataRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data().data;
+                    if (data && Array.isArray(data)) {
+                        console.log("Receiving Data Update from Cloud...");
+                        if(window.processRawData) {
+                            window.processRawData({ data: data }); 
                         }
-                    });
+                        
+                        // Update Time
+                        const time = docSnap.data().updatedAt ? new Date(docSnap.data().updatedAt).toLocaleString('id-ID') : '-';
+                        const timeEl = document.getElementById('lastUpdatedDisplay');
+                        if(timeEl) timeEl.innerText = time;
+                    }
+                } else {
+                    console.log("No data in cloud, loading sample.");
+                    if(window.loadSample) window.loadSample();
+                }
+            }, (error) => {
+                console.error("Data Listen Error:", error);
+            });
+
+            // 2. Listen for Notes Changes
+            const notesCol = collection(db, 'artifacts', APP_ID, 'public', 'data', 'field_notes');
+            onSnapshot(notesCol, (snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    const data = change.doc.data();
+                    const key = change.doc.id;
+                    if(window.updateLocalNote) window.updateLocalNote(key, data.text); 
+                    
+                    // UI Update
+                    const el = document.getElementById(`note-${key}`);
+                    if (el && document.activeElement !== el) {
+                        el.value = data.text;
+                        el.parentElement.classList.add('bg-green-100');
+                        setTimeout(() => el.parentElement.classList.remove('bg-green-100'), 500);
+                    }
                 });
-            }).catch((e) => {
-                console.error("Auth Error:", e);
-                document.getElementById('firebaseStatusText').innerText = "Auth Fail";
             });
         }
 
-        // EXPOSE FUNCTION TO SAVE
-        window.saveNoteToFirebase = async (key, value) => {
-            // Optimistic update
-            globalNotes[key] = value;
-            
-            const statusEl = document.getElementById('firebaseStatus');
-            if(statusEl.classList.contains('status-offline')) {
-                alert("Anda sedang offline. Catatan mungkin tidak tersimpan ke server.");
+        // --- PUBLIC FUNCTIONS (Attached to Window) ---
+
+        // 1. Upload CSV to Cloud (With Append/Unique Logic)
+        window.uploadDataToCloud = async (newRows) => {
+            if (!db) {
+                alert("Database belum terkoneksi. Coba refresh.");
                 return;
             }
-
+            updateStatus('syncing', 'Checking Database...');
+            
             try {
-                // Using 'merge: true' to not overwrite other potential fields
-                await setDoc(doc(db, 'field_notes', key), { 
-                    text: value, 
+                const mainDataRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'main_dataset', 'current');
+                
+                // 1. Fetch Existing Data
+                const snapshot = await getDoc(mainDataRef);
+                let existingData = [];
+                if (snapshot.exists()) {
+                    existingData = snapshot.data().data || [];
+                }
+
+                // 2. Create Set for Fast Lookup (by No Bagseals)
+                const existingKeys = new Set(existingData.map(r => r['No Bagseals']));
+                
+                let addedCount = 0;
+                let skippedCount = 0;
+                const mergedData = [...existingData];
+
+                // 3. Filter & Append
+                newRows.forEach(row => {
+                    const bagSeal = row['No Bagseals'];
+                    
+                    // Validasi: Harus punya No Bagseals
+                    if (bagSeal && bagSeal.trim() !== "") {
+                        if (!existingKeys.has(bagSeal)) {
+                            // Data Baru -> Tambahkan
+                            mergedData.push(row);
+                            existingKeys.add(bagSeal); // Hindari duplikat di file yang sama
+                            addedCount++;
+                        } else {
+                            // Data Lama -> Skip
+                            skippedCount++;
+                        }
+                    }
+                });
+
+                if (addedCount === 0) {
+                    updateStatus('online', 'No New Data');
+                    alert(`Upload Selesai.\nTidak ada data baru.\nSkipped (Duplikat): ${skippedCount}`);
+                    return;
+                }
+
+                updateStatus('syncing', `Uploading ${addedCount} rows...`);
+
+                // 4. Save Back to Firebase
+                await setDoc(mainDataRef, {
+                    data: mergedData,
                     updatedAt: new Date().toISOString(),
-                    user: "Manager/User" 
+                    uploader: "User"
+                });
+                
+                updateStatus('online', 'Data Synced');
+                alert(`Sukses!\nDitambahkan: ${addedCount} baris.\nDilewati (Duplikat): ${skippedCount} baris.`);
+
+            } catch (e) {
+                console.error("Upload Failed:", e);
+                updateStatus('offline', 'Upload Failed');
+                alert("Gagal upload ke Cloud. Pastikan internet stabil.");
+            }
+        };
+
+        // 2. Save Note
+        window.saveNoteToFirebase = async (key, value) => {
+            if (!db) return;
+            try {
+                const noteRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'field_notes', key);
+                await setDoc(noteRef, { 
+                    text: value,
+                    updatedAt: new Date().toISOString()
                 }, { merge: true });
                 
                 const el = document.getElementById(`note-${key}`);
@@ -405,29 +504,64 @@
                     setTimeout(() => el.classList.remove('note-saved'), 1000);
                 }
             } catch (e) {
-                console.error("Save Error:", e);
-                alert("Gagal menyimpan catatan. Periksa koneksi internet Anda.");
+                console.error("Note Save Error:", e);
             }
         };
 
-        // EXPOSE GET FUNCTION (used by renderRawTable)
-        window.getFirebaseNote = (key) => {
-            return globalNotes[key] || "";
-        }
-
     </script>
 
-    <!-- APP LOGIC SCRIPT -->
+    <!-- MAIN APP LOGIC -->
     <script>
-        // --- CONFIG ---
+        // CONFIG
         const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"];
         let allProcessedData = []; 
+        let globalNotes = {}; 
+        
         let chartSlaDest = null;
         let chartVolume = null;
 
-        // Set Date
-        const today = new Date();
-        document.getElementById('currentDate').innerText = today.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        // --- GLOBAL FUNCTIONS CALLED BY MODULE ---
+        window.updateLocalNote = (key, text) => {
+            globalNotes[key] = text;
+        }
+
+        window.loadSample = () => {
+            // Sample Data
+            const sample = `Tanggal,BATCH,Origin,VENDOR,SERVICE,Destinasi,SMU,FLIGHT,TANGGAL FLIGHT,ETD,No Bagseals,Berat Total (kg),Kuantitas Paket (Awb),Note,CATATAN,"ATA\nTanggal & jam","Penarikan\nTanggal & Jam",Tanggal DIterima,JAM
+01 Jan 2026,1,Surabaya,SMI,ECO,Balikpapan,243215,Km. Dharma Kencana 5 ,03 Jan 2026,11:15,40000560239139,14,23,,,,,04 Jan 2026,21:40
+01 Jan 2026,1,Surabaya,SMI,ECO,Balikpapan,243215,Km. Dharma Kencana 5 ,03 Jan 2026,11:15,40000591499678,14,15,,,,,04 Jan 2026,21:40
+01 Jan 2026,1,Surabaya,SMI,ECO,Balikpapan,243215,Km. Dharma Kencana 5 ,03 Jan 2026,11:15,40000560239700,12,31,,,,,04 Jan 2026,21:40
+13 Feb 2026,2,Surabaya,BSM,ECO,BANJARMASIN,3039,Dharma Kartika 2,14 Feb 2026,23:00,40000594721644,5,1,,,,,15 Feb 2026,02:30
+13 Feb 2026,2,Surabaya,BSM,ECO,BANJARMASIN,3039,Dharma Kartika 2,14 Feb 2026,23:00,40000594721589,4,1,,,,,15 Feb 2026,02:30
+13 Feb 2026,2,Surabaya,BSM,ECO,BANJARMASIN,3039,Dharma Kartika 2,14 Feb 2026,23:00,40000576224600,4,1,,,,,15 Feb 2026,02:30
+13 Feb 2026,2,Surabaya,BSM,ECO,PALANGKARAYA,3039,Dharma Kartika 2,14 Feb 2026,23:00,40000603413122,14,20,,,,,15 Feb 2026,02:30`;
+            Papa.parse(sample, { header: true, skipEmptyLines: true, complete: function(results) { processRawData(results); } });
+        };
+
+        // --- CSV UPLOAD HANDLER ---
+        document.getElementById('csvUpload').addEventListener('change', function(e) { 
+            if(e.target.files[0]) {
+                const dropZone = document.getElementById('dropZone');
+                const uploadText = document.getElementById('uploadText');
+                
+                dropZone.classList.add('upload-loading');
+                uploadText.innerText = "Processing...";
+                
+                Papa.parse(e.target.files[0], { 
+                    header: true, 
+                    skipEmptyLines: true, 
+                    complete: function(results) { 
+                        if(window.uploadDataToCloud) {
+                            window.uploadDataToCloud(results.data).then(() => {
+                                dropZone.classList.remove('upload-loading');
+                                uploadText.innerText = "Upload CSV (Append Mode)";
+                                e.target.value = ''; // Reset input
+                            });
+                        }
+                    } 
+                }); 
+            }
+        });
 
         // --- HELPERS ---
         function parseDate(dateStr) {
@@ -462,14 +596,16 @@
             return null; 
         }
 
-        // --- PROCESSING ---
-        function processRawData(results) {
+        // --- DATA PROCESSING ---
+        window.processRawData = function(results) {
             const data = results.data;
             allProcessedData = [];
+            
             data.forEach(row => {
                 const dateStartStr = row['Tanggal'];
                 const dateEndStr = row['Tanggal DIterima'] || row['Tanggal Diterima'];
                 let destRaw = row['Destinasi'];
+                
                 if (!dateStartStr || !dateEndStr || !destRaw) return;
 
                 let dest = destRaw.toUpperCase().trim();
@@ -491,6 +627,7 @@
                     });
                 }
             });
+
             initFilters();
             applyFilters();
         }
@@ -504,13 +641,21 @@
             });
             const vSelect = document.getElementById('filterVendor');
             const dSelect = document.getElementById('filterDest');
+            
+            const vVal = vSelect.value;
+            const dVal = dSelect.value;
+
             while(vSelect.options.length > 1) vSelect.remove(1);
             while(dSelect.options.length > 1) dSelect.remove(1);
+            
             Array.from(vendors).sort().forEach(v => vSelect.innerHTML += `<option value="${v}">${v}</option>`);
             Array.from(dests).sort().forEach(d => dSelect.innerHTML += `<option value="${d}">${d}</option>`);
+
+            if(Array.from(vendors).includes(vVal)) vSelect.value = vVal;
+            if(Array.from(dests).includes(dVal)) dSelect.value = dVal;
         }
 
-        function applyFilters() {
+        window.applyFilters = function() {
             const vendorVal = document.getElementById('filterVendor').value;
             const destVal = document.getElementById('filterDest').value;
             const startDateVal = document.getElementById('filterStartDate').value;
@@ -657,17 +802,14 @@
             });
         }
 
-        // --- RENDER MAIN TABLE (WITH FIREBASE NOTES) ---
+        // --- RENDER MAIN TABLE ---
         function renderRawTable(data) {
             const tbody = document.getElementById('tableBody');
             tbody.innerHTML = '';
             
-            // Unique Key Generator must be consistent across sessions
-            // Using Flight+Vendor+Dest+Date+Time ensures uniqueness per arrival
-            // Note: If you upload a file with different formatting, keys might change.
             const groups = {};
             data.forEach(row => {
-                // Sanitize fields for key generation
+                // Key Generation (Must matches listener)
                 const sFlight = (row['FLIGHT']||'NA').replace(/[^a-zA-Z0-9]/g, '');
                 const sVendor = (row['VENDOR']||'').replace(/[^a-zA-Z0-9]/g, '');
                 const sDest = (row.destNormalized||'').replace(/[^a-zA-Z0-9]/g, '');
@@ -684,7 +826,7 @@
                     vendor: row['VENDOR'],
                     dest: row.destNormalized,
                     paStats: {},
-                    rawKey: key // Use this sanitized key for Firestore
+                    rawKey: key
                 };
                 
                 if (!groups[key].paStats[paDate]) groups[key].paStats[paDate] = { mb: 0, qty: 0, sla: row.slaComputed };
@@ -693,7 +835,7 @@
             });
 
             const sortedGroups = Object.values(groups).sort((a, b) => new Date(b.receiveDate) - new Date(a.receiveDate));
-            if (sortedGroups.length === 0) { tbody.innerHTML = `<tr><td colspan="9" class="px-6 py-12 text-center text-slate-400 font-medium">Data tidak ditemukan untuk filter ini.</td></tr>`; return; }
+            if (sortedGroups.length === 0) { tbody.innerHTML = `<tr><td colspan="9" class="px-6 py-12 text-center text-slate-400 font-medium">Data tidak ditemukan.</td></tr>`; return; }
 
             sortedGroups.forEach(group => {
                 const paKeys = Object.keys(group.paStats).sort();
@@ -710,8 +852,7 @@
                     slaHTML += `<div class="font-bold ${slaColor} ${border}">${s.sla} Hari</div>`;
                 });
 
-                // Get note safely via window function (checking local cache first)
-                const noteValue = window.getFirebaseNote ? window.getFirebaseNote(group.rawKey) : "";
+                const noteValue = globalNotes[group.rawKey] || "";
 
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-white bg-white border-b border-slate-50 transition-colors group";
@@ -730,7 +871,7 @@
                     <td class="px-6 py-4 align-top bg-yellow-50/30 border-l border-yellow-50">
                         <textarea 
                             id="note-${group.rawKey}"
-                            onchange="window.saveNoteToFirebase('${group.rawKey}', this.value)"
+                            onchange="if(window.saveNoteToFirebase) window.saveNoteToFirebase('${group.rawKey}', this.value)"
                             placeholder="Tulis kendala..."
                             class="w-full h-16 bg-white border border-slate-200 rounded-lg p-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent note-input resize-none"
                         >${noteValue}</textarea>
@@ -739,21 +880,6 @@
                 tbody.appendChild(tr);
             });
         }
-
-        // --- INIT DATA ---
-        const sampleCsvData = `Tanggal,BATCH,Origin,VENDOR,SERVICE,Destinasi,SMU,FLIGHT,TANGGAL FLIGHT,ETD,No Bagseals,Berat Total (kg),Kuantitas Paket (Awb),Note,CATATAN,"ATA\nTanggal & jam","Penarikan\nTanggal & Jam",Tanggal DIterima,JAM
-01 Jan 2026,1,Surabaya,SMI,ECO,Balikpapan,243215,Km. Dharma Kencana 5 ,03 Jan 2026,11:15,40000560239139,14,23,,,,,04 Jan 2026,21:40
-01 Jan 2026,1,Surabaya,SMI,ECO,Balikpapan,243215,Km. Dharma Kencana 5 ,03 Jan 2026,11:15,40000591499678,14,15,,,,,04 Jan 2026,21:40
-01 Jan 2026,1,Surabaya,SMI,ECO,Balikpapan,243215,Km. Dharma Kencana 5 ,03 Jan 2026,11:15,40000560239700,12,31,,,,,04 Jan 2026,21:40
-01 Jan 2026,1,Surabaya,SMI,ECO,Balikpapan,243215,Km. Dharma Kencana 5 ,03 Jan 2026,11:15,40000603413122,14,20,,,,,04 Jan 2026,21:40
-13 Feb 2026,2,Surabaya,BSM,ECO,BANJARMASIN,3039,Dharma Kartika 2,14 Feb 2026,23:00,40000594721644,5,1,,,,,15 Feb 2026,02:30
-13 Feb 2026,2,Surabaya,BSM,ECO,BANJARMASIN,3039,Dharma Kartika 2,14 Feb 2026,23:00,40000594721589,4,1,,,,,15 Feb 2026,02:30
-13 Feb 2026,2,Surabaya,BSM,ECO,BANJARMASIN,3039,Dharma Kartika 2,14 Feb 2026,23:00,40000576224600,4,1,,,,,15 Feb 2026,02:30
-13 Feb 2026,2,Surabaya,BSM,ECO,BANJARMASIN,3039,Dharma Kartika 2,14 Feb 2026,23:00,40000603413122,14,20,,,,,15 Feb 2026,02:30
-13 Feb 2026,2,Surabaya,BSM,ECO,PALANGKARAYA,3039,Dharma Kartika 2,14 Feb 2026,23:00,40000603413122,14,20,,,,,15 Feb 2026,02:30`;
-
-        Papa.parse(sampleCsvData, { header: true, skipEmptyLines: true, complete: function(results) { processRawData(results); } });
-        document.getElementById('csvUpload').addEventListener('change', function(e) { if(e.target.files[0]) Papa.parse(e.target.files[0], { header: true, skipEmptyLines: true, complete: function(results) { processRawData(results); } }); });
     </script>
 </body>
 </html>
