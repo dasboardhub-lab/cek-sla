@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Logistics Dashboard (Real-Time)</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- PapaParse for CSV Parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background-color: #f8fafc; 
+            color: #334155; 
+        }
+        
+        /* Smooth Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* Custom Styles */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+        
+        .card-hoverable {
+            transition: all 0.3s ease;
+        }
+        .card-hoverable:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Input Styling */
+        .input-modern {
+            background-color: #f1f5f9;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+        }
+        .input-modern:focus {
+            background-color: #ffffff;
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        /* Note Input Animation */
+        .note-input {
+            transition: border-color 0.3s, background-color 0.3s;
+        }
+        .note-saved {
+            border-color: #10b981 !important;
+            background-color: #ecfdf5 !important;
+        }
+        .note-loading {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        /* Status Indicator for Firebase */
+        #firebaseStatus {
+            transition: all 0.3s ease;
+        }
+        .status-online { background-color: #10b981; }
+        .status-offline { background-color: #ef4444; }
+
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white; }
+            .card-hoverable { box-shadow: none; border: 1px solid #e2e8f0; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50">
+
+    <!-- TOP NAVIGATION -->
+    <nav class="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center gap-3">
+                    <div class="bg-indigo-600 text-white p-2 rounded-xl shadow-lg shadow-indigo-200">
+                        <i class="fas fa-boxes-stacked fa-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-lg font-bold text-slate-800 leading-tight">Logistics Ops</h1>
+                        <p class="text-xs text-slate-500 font-medium flex items-center gap-2">
+                            Dashboard & Real-time Notes
+                            <span class="flex items-center gap-1 text-[10px] bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+                                <span id="firebaseStatus" class="w-2 h-2 rounded-full status-offline"></span>
+                                <span id="firebaseStatusText">Connecting...</span>
+                            </span>
+                        </p>
+                    </div>
+                </div>
+                <div class="hidden md:flex items-center gap-4">
+                    <div class="text-right">
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Last Updated</p>
+                        <p class="text-sm font-semibold text-slate-700" id="currentDate">loading...</p>
+                    </div>
+                    <div class="h-8 w-px bg-slate-200"></div>
+                    <button onclick="window.print()" class="text-slate-500 hover:text-indigo-600 transition p-2 rounded-lg hover:bg-indigo-50">
+                        <i class="fas fa-print fa-lg"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+        <!-- 1. HERO & CONTROLS -->
+        <div class="no-print bg-white rounded-2xl shadow-sm border border-slate-200 p-1">
+            <div class="bg-slate-50 rounded-xl p-6 border border-slate-100">
+                <div class="flex flex-col lg:flex-row gap-6 justify-between items-end">
+                    
+                    <!-- Upload -->
+                    <div class="w-full lg:w-1/3">
+                        <label class="block text-xs font-bold text-indigo-600 uppercase tracking-wider mb-2">
+                            <i class="fas fa-database mr-1"></i> Upload Data (CSV)
+                        </label>
+                        <label class="flex flex-col w-full h-14 border-2 border-dashed border-slate-300 rounded-xl hover:bg-indigo-50 hover:border-indigo-300 transition cursor-pointer group items-center justify-center relative">
+                            <div class="flex items-center gap-2 text-slate-400 group-hover:text-indigo-600 transition">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <span class="text-sm font-medium">Klik untuk upload file CSV</span>
+                            </div>
+                            <input type="file" id="csvUpload" accept=".csv" class="opacity-0 absolute inset-0 cursor-pointer" />
+                        </label>
+                    </div>
+
+                    <!-- Filters -->
+                    <div class="w-full lg:w-2/3 grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Mulai Tgl Terima</label>
+                            <input type="date" id="filterStartDate" class="w-full input-modern rounded-lg px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Sampai Tgl Terima</label>
+                            <input type="date" id="filterEndDate" class="w-full input-modern rounded-lg px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Filter Vendor</label>
+                            <div class="relative">
+                                <select id="filterVendor" class="w-full input-modern rounded-lg px-3 py-2 text-xs font-medium text-slate-700 appearance-none focus:outline-none">
+                                    <option value="all">Semua Vendor</option>
+                                </select>
+                                <i class="fas fa-chevron-down absolute right-3 top-2.5 text-xs text-slate-400 pointer-events-none"></i>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Filter Destinasi</label>
+                            <div class="relative">
+                                <select id="filterDest" class="w-full input-modern rounded-lg px-3 py-2 text-xs font-medium text-slate-700 appearance-none focus:outline-none">
+                                    <option value="all">Semua Destinasi</option>
+                                </select>
+                                <i class="fas fa-chevron-down absolute right-3 top-2.5 text-xs text-slate-400 pointer-events-none"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Apply Btn -->
+                    <div class="w-full lg:w-auto">
+                        <button onclick="applyFilters()" class="w-full h-10 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-6 rounded-lg shadow-md shadow-indigo-200 transition active:scale-95 flex items-center justify-center gap-2">
+                            <i class="fas fa-filter"></i> Filter
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. KPI METRICS -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+            <!-- Metric 1 -->
+            <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm card-hoverable">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+                        <i class="fas fa-file-invoice"></i>
+                    </div>
+                    <span class="text-xs font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-full">Total Manifest</span>
+                </div>
+                <h3 class="text-2xl font-bold text-slate-800" id="totalShipments">0</h3>
+                <p class="text-xs text-slate-500 mt-1">Baris data terproses</p>
+            </div>
+
+            <!-- Metric 2 -->
+            <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm card-hoverable">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-10 h-10 rounded-full bg-teal-50 flex items-center justify-center text-teal-600">
+                        <i class="fas fa-stopwatch"></i>
+                    </div>
+                    <span class="text-xs font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-full">Rata-rata SLA</span>
+                </div>
+                <div class="flex items-end gap-2">
+                    <h3 class="text-2xl font-bold text-slate-800" id="avgSLA">0</h3>
+                    <span class="text-sm font-medium text-slate-400 mb-1">Hari</span>
+                </div>
+                <p class="text-xs text-slate-500 mt-1">Lead time pengiriman</p>
+            </div>
+
+            <!-- Metric 3 -->
+            <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm card-hoverable">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-10 h-10 rounded-full bg-violet-50 flex items-center justify-center text-violet-600">
+                        <i class="fas fa-cubes"></i>
+                    </div>
+                    <span class="text-xs font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-full">Total Koli</span>
+                </div>
+                <h3 class="text-2xl font-bold text-slate-800" id="totalParcels">0</h3>
+                <p class="text-xs text-slate-500 mt-1">Unit paket diterima</p>
+            </div>
+
+            <!-- Metric 4 -->
+            <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm card-hoverable">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-600">
+                        <i class="fas fa-weight-hanging"></i>
+                    </div>
+                    <span class="text-xs font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-full">Total Berat</span>
+                </div>
+                <div class="flex items-end gap-2">
+                    <h3 class="text-2xl font-bold text-slate-800" id="totalWeight">0</h3>
+                    <span class="text-sm font-medium text-slate-400 mb-1">Kg</span>
+                </div>
+                <p class="text-xs text-slate-500 mt-1">Tonase keseluruhan</p>
+            </div>
+        </div>
+
+        <!-- 3. VISUALIZATIONS -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+                <h3 class="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <span class="w-1 h-4 bg-indigo-500 rounded-full"></span>
+                    Performa SLA per Destinasi
+                </h3>
+                <div class="h-64">
+                    <canvas id="slaDestChart"></canvas>
+                </div>
+            </div>
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+                <h3 class="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <span class="w-1 h-4 bg-teal-500 rounded-full"></span>
+                    Volume Harian
+                </h3>
+                <div class="h-64">
+                    <canvas id="volumeChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. TABEL ANALISA VENDOR -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div>
+                    <h3 class="text-sm font-bold text-slate-800">Analisa Vendor & Destinasi</h3>
+                    <p class="text-xs text-slate-500">Breakdown performa SLA dan waktu kedatangan</p>
+                </div>
+                <div class="text-indigo-600 bg-indigo-50 p-2 rounded-lg">
+                    <i class="fas fa-chart-simple"></i>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead class="bg-slate-50 text-[11px] uppercase font-bold text-slate-500 tracking-wider">
+                        <tr id="vendorTableHeader">
+                            <!-- JS Injection -->
+                        </tr>
+                    </thead>
+                    <tbody class="text-xs sm:text-sm divide-y divide-slate-50" id="vendorTableBody">
+                        <!-- JS Injection -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 5. TABEL REKAPITULASI (MAIN DATA) -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden print-break">
+            <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div>
+                    <h3 class="text-sm font-bold text-slate-800">Rekapitulasi Muatan & Kapal</h3>
+                    <p class="text-xs text-slate-500">Log harian kedatangan kapal & catatan lapangan (Real-Time Sync)</p>
+                </div>
+                <div class="text-teal-600 bg-teal-50 p-2 rounded-lg">
+                    <i class="fas fa-ship"></i>
+                </div>
+            </div>
+            <div class="overflow-x-auto max-h-[800px]">
+                <table class="w-full text-left">
+                    <thead class="bg-slate-50 text-[11px] uppercase font-bold text-slate-500 tracking-wider sticky top-0 z-10 shadow-sm">
+                        <tr>
+                            <th class="px-6 py-4 w-[140px]">Waktu Terima</th>
+                            <th class="px-6 py-4">Komposisi PA</th>
+                            <th class="px-6 py-4 text-right">Total MB</th>
+                            <th class="px-6 py-4 text-right">Total Qty</th>
+                            <th class="px-6 py-4 text-center">SLA (PA)</th>
+                            <th class="px-6 py-4">Nama Kapal</th>
+                            <th class="px-6 py-4">Vendor</th>
+                            <th class="px-6 py-4">Destinasi</th>
+                            <th class="px-6 py-4 w-[250px] bg-yellow-50 text-yellow-700 border-l border-yellow-100">
+                                <i class="fas fa-edit mr-1"></i> Catatan Lapangan
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-xs sm:text-sm divide-y divide-slate-50" id="tableBody">
+                        <!-- JS Injection -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- FIREBASE & APP SCRIPT -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, doc, setDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+        // CONFIG USER
+        const firebaseConfig = {
+            apiKey: "AIzaSyAxpxGSwq9iTeDBNqW1pZMOTu_-KGt6iK4",
+            authDomain: "logsheet-5r.firebaseapp.com",
+            projectId: "logsheet-5r",
+            storageBucket: "logsheet-5r.firebasestorage.app",
+            messagingSenderId: "358725557740",
+            appId: "1:358725557740:web:c3493a376e2f70711ff4c9"
+        };
+
+        // INIT FIREBASE
+        let app, db, auth;
+        let globalNotes = {}; // Store notes locally for fast render
+
+        try {
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+            console.log("Firebase Initialized");
+        } catch(e) {
+            console.error("Firebase Init Error:", e);
+            document.getElementById('firebaseStatusText').innerText = "Config Error";
+        }
+
+        // AUTH & LISTEN
+        if(auth) {
+            signInAnonymously(auth).then(() => {
+                document.getElementById('firebaseStatus').classList.remove('status-offline');
+                document.getElementById('firebaseStatus').classList.add('status-online');
+                document.getElementById('firebaseStatusText').innerText = "Connected";
+
+                // Listen to Notes Collection
+                const notesCol = collection(db, 'field_notes');
+                onSnapshot(notesCol, (snapshot) => {
+                    snapshot.docChanges().forEach((change) => {
+                        const data = change.doc.data();
+                        const key = change.doc.id;
+                        globalNotes[key] = data.text; // Update local store
+
+                        // Update UI if element exists
+                        const el = document.getElementById(`note-${key}`);
+                        if (el && el.value !== data.text && document.activeElement !== el) {
+                            el.value = data.text;
+                            el.classList.add('bg-green-50'); 
+                            setTimeout(()=>el.classList.remove('bg-green-50'), 1000);
+                        }
+                    });
+                });
+            }).catch((e) => {
+                console.error("Auth Error:", e);
+                document.getElementById('firebaseStatusText').innerText = "Auth Fail";
+            });
+        }
+
+        // EXPOSE FUNCTION TO SAVE
+        window.saveNoteToFirebase = async (key, value) => {
+            // Optimistic update
+            globalNotes[key] = value;
+            
+            const statusEl = document.getElementById('firebaseStatus');
+            if(statusEl.classList.contains('status-offline')) {
+                alert("Anda sedang offline. Catatan mungkin tidak tersimpan ke server.");
+                return;
+            }
+
+            try {
+                // Using 'merge: true' to not overwrite other potential fields
+                await setDoc(doc(db, 'field_notes', key), { 
+                    text: value, 
+                    updatedAt: new Date().toISOString(),
+                    user: "Manager/User" 
+                }, { merge: true });
+                
+                const el = document.getElementById(`note-${key}`);
+                if(el) {
+                    el.classList.add('note-saved');
+                    setTimeout(() => el.classList.remove('note-saved'), 1000);
+                }
+            } catch (e) {
+                console.error("Save Error:", e);
+                alert("Gagal menyimpan catatan. Periksa koneksi internet Anda.");
+            }
+        };
+
+        // EXPOSE GET FUNCTION (used by renderRawTable)
+        window.getFirebaseNote = (key) => {
+            return globalNotes[key] || "";
+        }
+
+    </script>
+
+    <!-- APP LOGIC SCRIPT -->
+    <script>
+        // --- CONFIG ---
+        const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"];
+        let allProcessedData = []; 
+        let chartSlaDest = null;
+        let chartVolume = null;
+
+        // Set Date
+        const today = new Date();
+        document.getElementById('currentDate').innerText = today.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+        // --- HELPERS ---
+        function parseDate(dateStr) {
+            if(!dateStr) return null;
+            const date = new Date(dateStr);
+            return isNaN(date.getTime()) ? null : date;
+        }
+
+        function getTimeRange(timeStr) {
+            if (!timeStr) return null;
+            const parts = timeStr.split(':');
+            if (parts.length < 2) return null;
+            const hour = parseInt(parts[0]);
+            if (hour >= 0 && hour < 3) return "00-03";
+            if (hour >= 3 && hour < 6) return "03-06";
+            if (hour >= 6 && hour < 9) return "06-09";
+            if (hour >= 9 && hour < 12) return "09-12";
+            if (hour >= 12 && hour < 15) return "12-15";
+            if (hour >= 15 && hour < 18) return "15-18";
+            if (hour >= 18 && hour < 21) return "18-21";
+            if (hour >= 21 && hour <= 24) return "21-24";
+            return "Lainnya";
+        }
+
+        function calculateSLA(startDateStr, endDateStr) {
+            const start = parseDate(startDateStr);
+            const end = parseDate(endDateStr);
+            if (start && end) {
+                const diffTime = Math.abs(end - start);
+                return Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+            }
+            return null; 
+        }
+
+        // --- PROCESSING ---
+        function processRawData(results) {
+            const data = results.data;
+            allProcessedData = [];
+            data.forEach(row => {
+                const dateStartStr = row['Tanggal'];
+                const dateEndStr = row['Tanggal DIterima'] || row['Tanggal Diterima'];
+                let destRaw = row['Destinasi'];
+                if (!dateStartStr || !dateEndStr || !destRaw) return;
+
+                let dest = destRaw.toUpperCase().trim();
+                if (dest === 'PALANGKARAYA' || dest === 'BANJAR MASIN') dest = 'BANJARMASIN';
+
+                const sla = calculateSLA(dateStartStr, dateEndStr);
+                const startDate = parseDate(dateStartStr);
+                const endDate = parseDate(dateEndStr);
+
+                if (sla !== null && startDate && endDate) {
+                    allProcessedData.push({
+                        ...row,
+                        slaComputed: sla,
+                        destNormalized: dest,
+                        dateStartObj: startDate,
+                        dateEndObj: endDate,
+                        weight: parseFloat(row['Berat Total (kg)']) || 0,
+                        parcels: parseFloat(row['Kuantitas Paket (Awb)']) || 0
+                    });
+                }
+            });
+            initFilters();
+            applyFilters();
+        }
+
+        function initFilters() {
+            const vendors = new Set();
+            const dests = new Set();
+            allProcessedData.forEach(row => {
+                if(row['VENDOR']) vendors.add(row['VENDOR']);
+                if(row.destNormalized) dests.add(row.destNormalized);
+            });
+            const vSelect = document.getElementById('filterVendor');
+            const dSelect = document.getElementById('filterDest');
+            while(vSelect.options.length > 1) vSelect.remove(1);
+            while(dSelect.options.length > 1) dSelect.remove(1);
+            Array.from(vendors).sort().forEach(v => vSelect.innerHTML += `<option value="${v}">${v}</option>`);
+            Array.from(dests).sort().forEach(d => dSelect.innerHTML += `<option value="${d}">${d}</option>`);
+        }
+
+        function applyFilters() {
+            const vendorVal = document.getElementById('filterVendor').value;
+            const destVal = document.getElementById('filterDest').value;
+            const startDateVal = document.getElementById('filterStartDate').value;
+            const endDateVal = document.getElementById('filterEndDate').value;
+            const start = startDateVal ? new Date(startDateVal) : null;
+            const end = endDateVal ? new Date(endDateVal) : null;
+            if(end) end.setHours(23, 59, 59, 999); 
+
+            const filteredData = allProcessedData.filter(row => {
+                if (vendorVal !== 'all' && row['VENDOR'] !== vendorVal) return false;
+                if (destVal !== 'all' && row.destNormalized !== destVal) return false;
+                if (start && row.dateEndObj < start) return false;
+                if (end && row.dateEndObj > end) return false;
+                return true;
+            });
+            calculateMetricsAndRender(filteredData);
+        }
+
+        function calculateMetricsAndRender(data) {
+            let totalWeight = 0, totalParcels = 0;
+            const slaByDest = {}, volByDate = {}, vendorStats = {}, availableMonths = new Set();
+
+            data.forEach(row => {
+                totalWeight += row.weight;
+                totalParcels += row.parcels;
+                
+                const dateKey = row['Tanggal'];
+                if (!volByDate[dateKey]) volByDate[dateKey] = 0;
+                volByDate[dateKey]++;
+
+                const dest = row.destNormalized;
+                if (!slaByDest[dest]) slaByDest[dest] = { total: 0, count: 0 };
+                slaByDest[dest].total += row.slaComputed;
+                slaByDest[dest].count++;
+
+                const monthIndex = row.dateStartObj.getMonth();
+                availableMonths.add(monthIndex);
+                
+                const vendorKey = `${row['VENDOR']}||${dest}`;
+                if (!vendorStats[vendorKey]) vendorStats[vendorKey] = { vendor: row['VENDOR'], dest: dest, mbCount: 0, parcelCount: 0, timeRanges: {}, monthlySLA: {} };
+                
+                const v = vendorStats[vendorKey];
+                v.mbCount++;
+                v.parcelCount += row.parcels;
+                const rangeLabel = getTimeRange(row['JAM']);
+                if (rangeLabel) v.timeRanges[rangeLabel] = (v.timeRanges[rangeLabel] || 0) + 1;
+                if (!v.monthlySLA[monthIndex]) v.monthlySLA[monthIndex] = [];
+                v.monthlySLA[monthIndex].push(row.slaComputed);
+            });
+
+            document.getElementById('totalShipments').innerText = data.length.toLocaleString('id-ID');
+            document.getElementById('totalWeight').innerText = totalWeight.toLocaleString('id-ID');
+            document.getElementById('totalParcels').innerText = totalParcels.toLocaleString('id-ID');
+            const avgSLA = data.length ? (data.reduce((a,b)=>a+b.slaComputed,0) / data.length).toFixed(1) : 0;
+            document.getElementById('avgSLA').innerText = avgSLA;
+
+            renderVendorTable(vendorStats, Array.from(availableMonths).sort((a,b)=>a-b));
+            renderCharts(slaByDest, volByDate);
+            renderRawTable(data);
+        }
+
+        // --- RENDER VENDOR TABLE ---
+        function renderVendorTable(vendorStats, sortedMonths) {
+            const thead = document.getElementById('vendorTableHeader');
+            const tbody = document.getElementById('vendorTableBody');
+            let headerHTML = `<th class="px-6 py-3 border-b border-slate-100">Destinasi</th><th class="px-6 py-3 border-b border-slate-100">Vendor</th><th class="px-6 py-3 border-b border-slate-100 text-right">Total MB</th><th class="px-6 py-3 border-b border-slate-100 text-right">Total Qty</th>`;
+            sortedMonths.forEach(mIdx => headerHTML += `<th class="px-6 py-3 border-b border-slate-100 text-center">SLA ${MONTH_NAMES[mIdx]}</th>`);
+            headerHTML += `<th class="px-6 py-3 border-b border-slate-100 text-center">Jam Dominan</th>`;
+            thead.innerHTML = headerHTML;
+            tbody.innerHTML = '';
+
+            const sortedKeys = Object.keys(vendorStats).sort((a, b) => {
+                const va = vendorStats[a], vb = vendorStats[b];
+                return va.dest !== vb.dest ? va.dest.localeCompare(vb.dest) : va.vendor.localeCompare(vb.vendor);
+            });
+
+            if(sortedKeys.length === 0) tbody.innerHTML = `<tr><td colspan="10" class="px-6 py-8 text-center text-slate-400">Tidak ada data</td></tr>`;
+
+            sortedKeys.forEach(key => {
+                const stat = vendorStats[key];
+                let dominantRange = "-", maxCount = 0;
+                for (const [r, c] of Object.entries(stat.timeRanges)) if(c > maxCount) { maxCount = c; dominantRange = r; }
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-indigo-50/30 transition-colors group";
+                let rowHTML = `
+                    <td class="px-6 py-3 border-b border-slate-50 font-bold text-indigo-700">${stat.dest}</td>
+                    <td class="px-6 py-3 border-b border-slate-50 font-medium text-slate-700">${stat.vendor}</td>
+                    <td class="px-6 py-3 border-b border-slate-50 text-right text-slate-500 font-mono">${stat.mbCount.toLocaleString()}</td>
+                    <td class="px-6 py-3 border-b border-slate-50 text-right text-slate-500 font-mono">${stat.parcelCount.toLocaleString()}</td>
+                `;
+                sortedMonths.forEach(mIdx => {
+                    const slas = stat.monthlySLA[mIdx];
+                    let badge = '<span class="text-slate-300">-</span>';
+                    if (slas && slas.length > 0) {
+                        const avg = (slas.reduce((a,b)=>a+b,0) / slas.length).toFixed(1);
+                        const color = avg <= 4 ? 'bg-emerald-100 text-emerald-700' : (avg <= 7 ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700');
+                        badge = `<span class="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${color}">${avg}</span>`;
+                    }
+                    rowHTML += `<td class="px-6 py-3 border-b border-slate-50 text-center">${badge}</td>`;
+                });
+                rowHTML += `<td class="px-6 py-3 border-b border-slate-50 text-center"><span class="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-1 rounded border border-slate-200">${dominantRange}</span></td>`;
+                tr.innerHTML = rowHTML;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // --- RENDER CHARTS ---
+        function renderCharts(slaByDest, volByDate) {
+            Chart.defaults.font.family = "'Plus Jakarta Sans', sans-serif";
+            Chart.defaults.color = '#64748b';
+            
+            const destCtx = document.getElementById('slaDestChart').getContext('2d');
+            if (chartSlaDest) chartSlaDest.destroy();
+            chartSlaDest = new Chart(destCtx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(slaByDest),
+                    datasets: [{
+                        data: Object.values(slaByDest).map(v => (v.total/v.count).toFixed(1)),
+                        backgroundColor: '#6366f1', borderRadius: 6, barThickness: 24
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: {display: false} }, scales: { y: { beginAtZero: true, grid: {color: '#f1f5f9'} }, x: { grid: {display: false} } } }
+            });
+
+            const volCtx = document.getElementById('volumeChart').getContext('2d');
+            if (chartVolume) chartVolume.destroy();
+            const dates = Object.keys(volByDate).sort((a,b) => new Date(a) - new Date(b));
+            chartVolume = new Chart(volCtx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        data: dates.map(d => volByDate[d]),
+                        borderColor: '#14b8a6', backgroundColor: (ctx) => {
+                            const grad = ctx.chart.ctx.createLinearGradient(0,0,0,200);
+                            grad.addColorStop(0, 'rgba(20, 184, 166, 0.2)'); grad.addColorStop(1, 'rgba(20, 184, 166, 0)');
+                            return grad;
+                        }, fill: true, tension: 0.4, borderWidth: 2, pointRadius: 0, pointHoverRadius: 6
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: {display: false} }, scales: { y: { beginAtZero: true, grid: {color: '#f1f5f9'} }, x: { grid: {display: false} } } }
+            });
+        }
+
+        // --- RENDER MAIN TABLE (WITH FIREBASE NOTES) ---
+        function renderRawTable(data) {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            
+            // Unique Key Generator must be consistent across sessions
+            // Using Flight+Vendor+Dest+Date+Time ensures uniqueness per arrival
+            // Note: If you upload a file with different formatting, keys might change.
+            const groups = {};
+            data.forEach(row => {
+                // Sanitize fields for key generation
+                const sFlight = (row['FLIGHT']||'NA').replace(/[^a-zA-Z0-9]/g, '');
+                const sVendor = (row['VENDOR']||'').replace(/[^a-zA-Z0-9]/g, '');
+                const sDest = (row.destNormalized||'').replace(/[^a-zA-Z0-9]/g, '');
+                const sDate = (row['Tanggal DIterima']||row['Tanggal Diterima']||'-').replace(/[^a-zA-Z0-9]/g, '');
+                const sTime = (row['JAM']||'-').replace(/[^a-zA-Z0-9]/g, '');
+                
+                const key = `NOTE_${sFlight}_${sVendor}_${sDest}_${sDate}_${sTime}`;
+                const paDate = row['Tanggal'];
+                
+                if (!groups[key]) groups[key] = {
+                    receiveDate: row['Tanggal DIterima'] || row['Tanggal Diterima'] || '-',
+                    receiveTime: row['JAM'] || '-',
+                    name: row['FLIGHT'] || 'N/A',
+                    vendor: row['VENDOR'],
+                    dest: row.destNormalized,
+                    paStats: {},
+                    rawKey: key // Use this sanitized key for Firestore
+                };
+                
+                if (!groups[key].paStats[paDate]) groups[key].paStats[paDate] = { mb: 0, qty: 0, sla: row.slaComputed };
+                groups[key].paStats[paDate].mb++;
+                groups[key].paStats[paDate].qty += row.parcels;
+            });
+
+            const sortedGroups = Object.values(groups).sort((a, b) => new Date(b.receiveDate) - new Date(a.receiveDate));
+            if (sortedGroups.length === 0) { tbody.innerHTML = `<tr><td colspan="9" class="px-6 py-12 text-center text-slate-400 font-medium">Data tidak ditemukan untuk filter ini.</td></tr>`; return; }
+
+            sortedGroups.forEach(group => {
+                const paKeys = Object.keys(group.paStats).sort();
+                let mbHTML = '', qtyHTML = '', paHTML = '', slaHTML = '';
+
+                paKeys.forEach((date, i) => {
+                    const s = group.paStats[date];
+                    const border = i === paKeys.length - 1 ? '' : 'border-b border-indigo-50 pb-1 mb-1';
+                    const slaColor = s.sla <= 5 ? 'text-emerald-600' : (s.sla <= 7 ? 'text-amber-600' : 'text-rose-600');
+                    
+                    mbHTML += `<div class="font-mono text-slate-600 ${border}">${s.mb.toLocaleString()}</div>`;
+                    qtyHTML += `<div class="font-mono text-slate-600 ${border}">${s.qty.toLocaleString()}</div>`;
+                    paHTML += `<div class="text-slate-600 whitespace-nowrap ${border}"><i class="far fa-calendar text-slate-400 mr-1.5 text-[10px]"></i>${date}</div>`;
+                    slaHTML += `<div class="font-bold ${slaColor} ${border}">${s.sla} Hari</div>`;
+                });
+
+                // Get note safely via window function (checking local cache first)
+                const noteValue = window.getFirebaseNote ? window.getFirebaseNote(group.rawKey) : "";
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-white bg-white border-b border-slate-50 transition-colors group";
+                tr.innerHTML = `
+                    <td class="px-6 py-4 align-top">
+                        <div class="font-bold text-slate-700">${group.receiveDate}</div>
+                        <div class="text-xs text-slate-400 font-mono mt-0.5 bg-slate-100 inline-block px-1 rounded">${group.receiveTime}</div>
+                    </td>
+                    <td class="px-6 py-4 align-top bg-indigo-50/20">${paHTML}</td>
+                    <td class="px-6 py-4 align-top text-right bg-indigo-50/20">${mbHTML}</td>
+                    <td class="px-6 py-4 align-top text-right bg-indigo-50/20">${qtyHTML}</td>
+                    <td class="px-6 py-4 align-top text-center bg-indigo-50/20">${slaHTML}</td>
+                    <td class="px-6 py-4 align-top font-bold text-indigo-700">${group.name}</td>
+                    <td class="px-6 py-4 align-top text-slate-600 font-medium">${group.vendor}</td>
+                    <td class="px-6 py-4 align-top"><span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-800">${group.dest}</span></td>
+                    <td class="px-6 py-4 align-top bg-yellow-50/30 border-l border-yellow-50">
+                        <textarea 
+                            id="note-${group.rawKey}"
+                            onchange="window.saveNoteToFirebase('${group.rawKey}', this.value)"
+                            placeholder="Tulis kendala..."
+                            class="w-full h-16 bg-white border border-slate-200 rounded-lg p-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent note-input resize-none"
+                        >${noteValue}</textarea>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // --- INIT DATA ---
+        const sampleCsvData = `Tanggal,BATCH,Origin,VENDOR,SERVICE,Destinasi,SMU,FLIGHT,TANGGAL FLIGHT,ETD,No Bagseals,Berat Total (kg),Kuantitas Paket (Awb),Note,CATATAN,"ATA\nTanggal & jam","Penarikan\nTanggal & Jam",Tanggal DIterima,JAM
+01 Jan 2026,1,Surabaya,SMI,ECO,Balikpapan,243215,Km. Dharma Kencana 5 ,03 Jan 2026,11:15,40000560239139,14,23,,,,,04 Jan 2026,21:40
+01 Jan 2026,1,Surabaya,SMI,ECO,Balikpapan,243215,Km. Dharma Kencana 5 ,03 Jan 2026,11:15,40000591499678,14,15,,,,,04 Jan 2026,21:40
+01 Jan 2026,1,Surabaya,SMI,ECO,Balikpapan,243215,Km. Dharma Kencana 5 ,03 Jan 2026,11:15,40000560239700,12,31,,,,,04 Jan 2026,21:40
+01 Jan 2026,1,Surabaya,SMI,ECO,Balikpapan,243215,Km. Dharma Kencana 5 ,03 Jan 2026,11:15,40000603413122,14,20,,,,,04 Jan 2026,21:40
+13 Feb 2026,2,Surabaya,BSM,ECO,BANJARMASIN,3039,Dharma Kartika 2,14 Feb 2026,23:00,40000594721644,5,1,,,,,15 Feb 2026,02:30
+13 Feb 2026,2,Surabaya,BSM,ECO,BANJARMASIN,3039,Dharma Kartika 2,14 Feb 2026,23:00,40000594721589,4,1,,,,,15 Feb 2026,02:30
+13 Feb 2026,2,Surabaya,BSM,ECO,BANJARMASIN,3039,Dharma Kartika 2,14 Feb 2026,23:00,40000576224600,4,1,,,,,15 Feb 2026,02:30
+13 Feb 2026,2,Surabaya,BSM,ECO,BANJARMASIN,3039,Dharma Kartika 2,14 Feb 2026,23:00,40000603413122,14,20,,,,,15 Feb 2026,02:30
+13 Feb 2026,2,Surabaya,BSM,ECO,PALANGKARAYA,3039,Dharma Kartika 2,14 Feb 2026,23:00,40000603413122,14,20,,,,,15 Feb 2026,02:30`;
+
+        Papa.parse(sampleCsvData, { header: true, skipEmptyLines: true, complete: function(results) { processRawData(results); } });
+        document.getElementById('csvUpload').addEventListener('change', function(e) { if(e.target.files[0]) Papa.parse(e.target.files[0], { header: true, skipEmptyLines: true, complete: function(results) { processRawData(results); } }); });
+    </script>
+</body>
+</html>
