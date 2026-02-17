@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Executive Dashboard - Logistics Performance (Cloud Sync)</title>
+    <title>Executive Dashboard</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -85,7 +85,7 @@
 
     <!-- TOP NAVIGATION -->
     <nav class="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="w-full px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16 items-center">
                 <div class="flex items-center gap-3">
                     <div class="bg-indigo-600 text-white p-2 rounded-xl shadow-lg shadow-indigo-200">
@@ -116,7 +116,7 @@
         </div>
     </nav>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <main class="w-full px-4 sm:px-6 lg:px-8 py-8 space-y-8">
 
         <!-- 1. HERO & CONTROLS -->
         <div class="no-print bg-white rounded-2xl shadow-sm border border-slate-200 p-1">
@@ -353,7 +353,7 @@
                             <th class="px-6 py-4 bg-slate-50 border-l border-slate-100 whitespace-nowrap">Nama Kapal</th>
                             <th class="px-6 py-4 bg-slate-50 whitespace-nowrap">Vendor</th>
                             <th class="px-6 py-4 bg-slate-50 whitespace-nowrap">Destinasi</th>
-                            <th class="px-6 py-4 w-[450px] bg-yellow-50 text-yellow-700 border-l border-yellow-200 whitespace-nowrap">
+                            <th class="px-6 py-4 w-[600px] bg-yellow-50 text-yellow-700 border-l border-yellow-200 whitespace-nowrap">
                                 <i class="fas fa-edit mr-1"></i> Catatan
                             </th>
                         </tr>
@@ -416,22 +416,30 @@
 
         // --- LISTENERS ---
         function initListeners() {
+            // 1. Listen for Main Data Changes (Koleksi shipments)
             const shipmentsCol = collection(db, 'artifacts', APP_ID, 'public', 'data', 'shipments');
+            
             onSnapshot(shipmentsCol, (snapshot) => {
                 const data = snapshot.docs.map(doc => doc.data());
+                console.log(`Cloud Sync: Received ${data.length} records.`);
+                
                 if (data.length > 0) {
                     if (window.processRawData) window.processRawData({ data: data });
                 } else {
                     if (window.loadSample) window.loadSample();
                 }
+            }, (error) => {
+                console.error("Data Listen Error:", error);
             });
 
+            // 2. Listen for Notes Changes
             const notesCol = collection(db, 'artifacts', APP_ID, 'public', 'data', 'field_notes');
             onSnapshot(notesCol, (snapshot) => {
                 snapshot.docChanges().forEach((change) => {
                     const data = change.doc.data();
                     const key = change.doc.id;
                     if(window.updateLocalNote) window.updateLocalNote(key, data.text); 
+                    
                     const el = document.getElementById(`note-${key}`);
                     if (el && document.activeElement !== el) {
                         el.value = data.text;
@@ -441,38 +449,72 @@
         }
 
         // --- PUBLIC FUNCTIONS ---
+
+        // 1. Upload CSV to Cloud (Collection Based + Batching)
         window.uploadDataToCloud = async (newRows) => {
-            if (!db) { alert("Database belum terkoneksi."); return; }
+            if (!db) {
+                alert("Database belum terkoneksi.");
+                return;
+            }
             updateStatus('syncing', 'Uploading in batches...');
+            
             try {
                 let addedCount = 0;
                 let batch = writeBatch(db);
                 let opCount = 0;
+
                 for (const row of newRows) {
                     const bagSeal = row['No Bagseals'];
                     if (bagSeal && bagSeal.trim() !== "") {
                         const docRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'shipments', bagSeal);
-                        batch.set(docRef, { ...row, uploadedAt: new Date().toISOString() }, { merge: true });
-                        opCount++; addedCount++;
-                        if (opCount === 450) { await batch.commit(); batch = writeBatch(db); opCount = 0; updateStatus('syncing', `Progress: ${addedCount} rows...`); }
+                        
+                        batch.set(docRef, {
+                            ...row,
+                            uploadedAt: new Date().toISOString()
+                        }, { merge: true });
+
+                        opCount++;
+                        addedCount++;
+
+                        if (opCount === 450) { 
+                            await batch.commit();
+                            batch = writeBatch(db);
+                            opCount = 0;
+                            updateStatus('syncing', `Progress: ${addedCount} rows...`);
+                        }
                     }
                 }
+
                 if (opCount > 0) await batch.commit();
+
                 updateStatus('online', 'Data Synced');
                 alert(`Upload Selesai!\nProses data: ${newRows.length}\nBerhasil sinkronisasi ke cloud.`);
+
             } catch (e) {
-                console.error(e); updateStatus('offline', 'Upload Failed');
+                console.error("Upload Failed:", e);
+                updateStatus('offline', 'Upload Failed');
+                alert("Gagal upload. Masalah koneksi atau izin database.");
             }
         };
 
+        // 2. Save Note
         window.saveNoteToFirebase = async (key, value) => {
             if (!db) return;
             try {
                 const noteRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'field_notes', key);
-                await setDoc(noteRef, { text: value, updatedAt: new Date().toISOString() }, { merge: true });
+                await setDoc(noteRef, { 
+                    text: value,
+                    updatedAt: new Date().toISOString()
+                }, { merge: true });
+                
                 const el = document.getElementById(`note-${key}`);
-                if(el) { el.classList.add('note-saved'); setTimeout(() => el.classList.remove('note-saved'), 1000); }
-            } catch (e) { console.error(e); }
+                if(el) {
+                    el.classList.add('note-saved');
+                    setTimeout(() => el.classList.remove('note-saved'), 1000);
+                }
+            } catch (e) {
+                console.error("Note Save Error:", e);
+            }
         };
     </script>
 
@@ -491,7 +533,9 @@
         window.loadSample = () => {
             // Using a tiny sample just for structure if DB is empty
             const sample = `Tanggal,BATCH,Origin,VENDOR,SERVICE,Destinasi,SMU,FLIGHT,TANGGAL FLIGHT,ETD,No Bagseals,Berat Total (kg),Kuantitas Paket (Awb),Note,CATATAN,"ATA\nTanggal & jam","Penarikan\nTanggal & Jam",Tanggal DIterima,JAM
-01 Jan 2026,1,Surabaya,SMI,ECO,Balikpapan,243215,Km. Dharma Kencana 5 ,03 Jan 2026,11:15,40000560239139,14,23,,,,,04 Jan 2026,21:40`;
+01 Jan 2026,1,Surabaya,SMI,ECO,Balikpapan,243215,Km. Dharma Kencana 5 ,03 Jan 2026,11:15,40000560239139,14,23,,,,,04 Jan 2026,21:40
+01 Jan 2026,1,Surabaya,SMI,ECO,Balikpapan,243215,Km. Dharma Kencana 5 ,03 Jan 2026,11:15,40000591499678,14,15,,,,,04 Jan 2026,21:40
+13 Feb 2026,2,Surabaya,BSM,ECO,BANJARMASIN,3039,Dharma Kartika 2,14 Feb 2026,23:00,40000594721644,5,1,,,,,15 Feb 2026,02:30`;
             Papa.parse(sample, { header: true, skipEmptyLines: true, complete: function(results) { processRawData(results); } });
         };
 
