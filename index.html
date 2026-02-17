@@ -937,8 +937,6 @@
             const clusterMap = {};
             
             Object.values(groups).forEach(arrival => {
-                // Key for cluster: Dest + Handover Date string
-                // Ini menggabungkan baris jika Destinasi SAMA dan Tanggal Handover SAMA
                 const clusterKey = `${arrival.handoverDate}||${arrival.dest}`;
                 
                 if (!clusterMap[clusterKey]) {
@@ -952,7 +950,7 @@
                 clusterMap[clusterKey].arrivals.push(arrival);
             });
 
-            // --- 2. SORT CLUSTERS (UPDATED LOGIC) ---
+            // --- 2. SORT CLUSTERS ---
             // Urutan: Handover Date (Terbaru) -> Destinasi (A-Z)
             const sortedClusters = Object.values(clusterMap).sort((a,b) => {
                 const hA = a.handoverDateObj || new Date(0);
@@ -997,20 +995,24 @@
                     const arrivalRows = paKeys.length;
                     const noteValue = globalNotes[group.rawKey] || "";
                     
-                    // Auth logic
                     const readOnlyAttr = isAuthorized ? '' : 'readonly';
                     const lockClass = isAuthorized ? 'bg-white' : 'bg-slate-100 cursor-pointer';
                     const placeholder = isAuthorized ? 'Tulis kendala...' : 'Klik untuk buka kunci...';
 
-                    // Styling Grup: Bedakan warna background antar tanggal handover yg berbeda
+                    // --- STYLING PEMISAH TANGGAL (UPDATED) ---
                     let groupClass = 'bg-white';
-                    if (cIndex > 0) {
-                         // Cek jika tanggal beda dengan sebelumnya, kasih border tebal
+                    
+                    // Cek jika ini adalah cluster baru (bukan yang pertama)
+                    if (cIndex > 0 && aIndex === 0) {
                          const prevCluster = sortedClusters[cIndex-1];
+                         
+                         // Jika TANGGAL Handover berubah dari baris sebelumnya
                          if (prevCluster.handoverDate !== cluster.handoverDate) {
-                             groupClass += " border-t-8 border-slate-100"; // Spacer antar tanggal
-                         } else if (prevCluster.dest !== cluster.dest) {
-                             groupClass += " border-t-2 border-slate-100"; // Spacer tipis antar destinasi di tanggal yg sama
+                             // BERIKAN BATAS TEBAL & GELAP (Sepemrti permintaan: "lebih terang/jelas")
+                             groupClass += " border-t-8 border-slate-300"; 
+                         } else {
+                             // Jika Tanggal SAMA (hanya beda destinasi), batas biasa
+                             groupClass += " border-t-2 border-slate-100"; 
                          }
                     }
 
@@ -1019,19 +1021,24 @@
                         const slaColor = s.sla <= 5 ? 'text-emerald-600 bg-emerald-50' : (s.sla <= 7 ? 'text-amber-600 bg-amber-50' : 'text-rose-600 bg-rose-50');
                         const slaBadge = `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold ${slaColor}">${s.sla} Hari</span>`;
                         
+                        // Border antar baris detail (PA) dalam satu grup shipment
                         let borderClass = 'border-b border-slate-100';
-                        // Garis penutup grup
-                        if (i === arrivalRows - 1 && aIndex === cluster.arrivals.length - 1) {
-                             // Baris terakhir dari cluster
+                        
+                        // Terapkan border atas khusus untuk baris pertama dalam grup ini
+                        let trClass = `${groupClass} hover:bg-indigo-50/10 transition-colors ${borderClass}`;
+                        if (i === 0) {
+                            // Baris pertama mengambil style groupClass yang sudah diset border tebalnya di atas
+                        } else {
+                            // Baris selanjutnya reset border atasnya
+                            trClass = `bg-white hover:bg-indigo-50/10 transition-colors ${borderClass}`;
                         }
 
                         const tr = document.createElement('tr'); 
-                        tr.className = `${groupClass} hover:bg-indigo-50/10 transition-colors ${borderClass}`;
+                        tr.className = trClass;
                         
                         let html = '';
 
                         // 1. Handover SS (Cluster Rowspan)
-                        // Hanya render di baris pertama dari cluster ini
                         if (aIndex === 0 && i === 0) {
                             html += `
                                 <td class="px-6 py-4 align-middle border-r border-slate-100 whitespace-nowrap bg-indigo-50/30 font-bold text-indigo-900" rowspan="${totalClusterRows}">
@@ -1070,7 +1077,6 @@
                                 </td>
                             `;
                             
-                            // DESTINASI: Digabung per Cluster (Destinasi yg sama pada tanggal handover yg sama)
                             if (aIndex === 0) {
                                 html += `
                                     <td class="px-6 py-4 align-middle border-r border-slate-100 whitespace-nowrap" rowspan="${totalClusterRows}">
