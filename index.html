@@ -343,6 +343,7 @@
                 <table class="w-full text-left border-collapse">
                     <thead class="bg-slate-50 text-[11px] uppercase font-bold text-slate-500 tracking-wider sticky top-0 z-10 shadow-sm border-b border-slate-200">
                         <tr>
+                            <th class="px-6 py-4 w-[120px] bg-slate-50 whitespace-nowrap bg-indigo-50/30">Handover SS</th>
                             <th class="px-6 py-4 w-[160px] bg-slate-50 whitespace-nowrap">Waktu Terima</th>
                             <th class="px-6 py-4 bg-slate-50 border-l border-slate-100 whitespace-nowrap">Komposisi PA</th>
                             <th class="px-6 py-4 bg-slate-50 text-center whitespace-nowrap">Batch</th>
@@ -563,10 +564,65 @@
             }
         });
 
+        // Safe Date Parsing for ID months
         function parseDate(dateStr) {
             if(!dateStr) return null;
-            const date = new Date(dateStr);
+            // Map ID to EN months if needed
+            let safeDateStr = dateStr;
+            const monthMap = { 'Mei': 'May', 'Ags': 'Aug', 'Okt': 'Oct', 'Des': 'Dec' };
+            for (const [id, en] of Object.entries(monthMap)) {
+                if (safeDateStr.includes(id)) safeDateStr = safeDateStr.replace(id, en);
+            }
+            const date = new Date(safeDateStr);
             return isNaN(date.getTime()) ? null : date;
+        }
+
+        // Logic for Handover Date Calculation (Updated: +1 if >= 15:00)
+        function calculateHandover(dateStr, timeStr) {
+            if (!dateStr || !timeStr || dateStr === '-' || timeStr === '-') return '-';
+            
+            const timeParts = timeStr.split(':');
+            if(timeParts.length < 1) return dateStr;
+            const hour = parseInt(timeParts[0]);
+            
+            // Logic: > 15:00 -> +1 Day. 
+            let addDay = 0;
+            if (hour >= 15) {
+                addDay = 1;
+            }
+            
+            const d = parseDate(dateStr);
+            if(!d) return dateStr;
+            
+            d.setDate(d.getDate() + addDay);
+            
+            const day = String(d.getDate()).padStart(2, '0');
+            const month = MONTH_NAMES[d.getMonth()];
+            const year = d.getFullYear();
+            
+            return `${day} ${month} ${year}`;
+        }
+
+        // New Helper: Return Handover Date Object for SLA Calc
+        function getHandoverDateObj(dateStr, timeStr) {
+            if (!dateStr) return null;
+            const d = parseDate(dateStr);
+            if (!d) return null;
+            
+            if (timeStr && timeStr !== '-') {
+                const hour = parseInt(timeStr.split(':')[0]);
+                if (hour >= 15) {
+                    d.setDate(d.getDate() + 1);
+                }
+            }
+            return d;
+        }
+
+        // Updated SLA Calculation (Handover - PA)
+        function calculateDiffDays(start, end) {
+            if (!start || !end) return null;
+            const diffTime = Math.abs(end - start);
+            return Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
         }
 
         function getTimeRange(timeStr) {
@@ -583,36 +639,32 @@
             return "Lainnya";
         }
 
-        function calculateSLA(startDateStr, endDateStr) {
-            const start = parseDate(startDateStr);
-            const end = parseDate(endDateStr);
-            if (start && end) {
-                const diffTime = Math.abs(end - start);
-                return Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-            }
-            return null; 
-        }
-
         window.processRawData = function(results) {
             const data = results.data;
             allProcessedData = [];
             data.forEach(row => {
-                const dateStartStr = row['Tanggal'];
-                const dateEndStr = row['Tanggal DIterima'] || row['Tanggal Diterima'];
+                const paDateStr = row['Tanggal']; // PA is Origin Date
+                const receiveDateStr = row['Tanggal DIterima'] || row['Tanggal Diterima'];
+                const timeStr = row['JAM'];
                 let destRaw = row['Destinasi'];
-                if (!dateStartStr || !dateEndStr || !destRaw) return;
+                
+                if (!paDateStr || !receiveDateStr || !destRaw) return;
 
                 let dest = destRaw.toUpperCase().trim();
                 if (dest === 'PALANGKARAYA' || dest === 'BANJAR MASIN') dest = 'BANJARMASIN';
 
-                const sla = calculateSLA(dateStartStr, dateEndStr);
+                // New SLA Logic: Handover (calculated) - PA (Origin)
+                const paDateObj = parseDate(paDateStr);
+                const handoverDateObj = getHandoverDateObj(receiveDateStr, timeStr);
+                const sla = calculateDiffDays(paDateObj, handoverDateObj);
+
                 if (sla !== null) {
                     allProcessedData.push({
                         ...row,
                         slaComputed: sla,
                         destNormalized: dest,
-                        dateStartObj: parseDate(dateStartStr),
-                        dateEndObj: parseDate(dateEndStr),
+                        dateStartObj: paDateObj,
+                        dateEndObj: parseDate(receiveDateStr), // Keep receive date for filtering/monthly aggregation
                         weight: parseFloat(row['Berat Total (kg)']) || 0,
                         parcels: parseFloat(row['Kuantitas Paket (Awb)']) || 0
                     });
@@ -708,7 +760,6 @@
             
             const uniqueSLAs = [...new Set(data.map(d => d.slaComputed))].sort((a,b) => a-b);
             
-            // HEADER
             let headerHTML = `<tr class="bg-slate-50 text-[11px] uppercase font-bold text-slate-500 tracking-wider">
                 <th class="px-6 py-3 border-b border-slate-100">Destinasi</th>
                 <th class="px-6 py-3 border-b border-slate-100">Vendor</th>`;
@@ -718,9 +769,8 @@
             headerHTML += `</tr>`;
             head.innerHTML = headerHTML;
 
-            // DATA
             const matrix = {};
-            const colTotals = {}; // { sla: { mb: 0, qty: 0 } }
+            const colTotals = {}; 
 
             data.forEach(row => {
                 const key = `${row.destNormalized}||${row['VENDOR']}`;
@@ -730,13 +780,11 @@
                 matrix[key].counts[row.slaComputed].mb++;
                 matrix[key].counts[row.slaComputed].qty += row.parcels;
 
-                // Column Totals
                 if (!colTotals[row.slaComputed]) colTotals[row.slaComputed] = { mb: 0, qty: 0 };
                 colTotals[row.slaComputed].mb++;
                 colTotals[row.slaComputed].qty += row.parcels;
             });
 
-            // BODY
             body.innerHTML = '';
             const sortedKeys = Object.keys(matrix).sort((a, b) => {
                 const va = matrix[a], vb = matrix[b];
@@ -777,15 +825,12 @@
                 body.appendChild(tr);
             });
 
-            // FOOTER (Totals & Percentage)
             let footerHTML = `<tr>
                 <td class="px-6 py-4 text-right text-indigo-900 uppercase tracking-wider" colspan="2">TOTAL & % KONTRIBUSI</td>`;
             
             uniqueSLAs.forEach(sla => {
                 const t = colTotals[sla] || { mb: 0, qty: 0 };
                 const pct = grandTotalQty > 0 ? ((t.qty / grandTotalQty) * 100).toFixed(1) : 0;
-                
-                // Color highlight for high percentages
                 const pctColor = pct > 20 ? 'text-indigo-600' : 'text-slate-500';
 
                 footerHTML += `
@@ -847,6 +892,7 @@
                 if (!groups[k]) groups[k] = {
                     receiveDate: row['Tanggal DIterima'] || row['Tanggal Diterima'] || '-',
                     receiveTime: row['JAM'] || '-',
+                    handoverDate: calculateHandover(row['Tanggal DIterima'] || row['Tanggal Diterima'], row['JAM'] || '-'), 
                     name: row['FLIGHT'] || 'N/A',
                     vendor: row['VENDOR'],
                     dest: row.destNormalized,
@@ -863,8 +909,13 @@
                 groups[k].paStats[compositeKey].qty += row.parcels;
             });
 
-            const sortedGroups = Object.values(groups).sort((a, b) => new Date(b.receiveDate) - new Date(a.receiveDate));
-            if (sortedGroups.length === 0) { tbody.innerHTML = `<tr><td colspan="9" class="px-6 py-8 text-center text-slate-400">Data tidak ditemukan.</td></tr>`; return; }
+            // SORT: Dest (Asc) -> ReceiveDate (Desc)
+            const sortedGroups = Object.values(groups).sort((a, b) => {
+                if (a.dest !== b.dest) return a.dest.localeCompare(b.dest);
+                return new Date(b.receiveDate) - new Date(a.receiveDate);
+            });
+
+            if (sortedGroups.length === 0) { tbody.innerHTML = `<tr><td colspan="10" class="px-6 py-8 text-center text-slate-400">Data tidak ditemukan.</td></tr>`; return; }
 
             sortedGroups.forEach((group, index) => {
                 const paKeys = Object.keys(group.paStats).sort((a,b) => {
@@ -875,20 +926,32 @@
                 
                 const rowCount = paKeys.length;
                 const noteValue = globalNotes[group.rawKey] || "";
-                const groupBgClass = index % 2 === 0 ? 'bg-white' : 'bg-slate-50/50';
+                
+                let groupClass = index % 2 === 0 ? 'bg-white' : 'bg-slate-50/50';
+                if(index > 0 && sortedGroups[index-1].dest !== group.dest) {
+                    groupClass += " border-t-4 border-indigo-100"; 
+                }
                 
                 paKeys.forEach((key, i) => {
                     const s = group.paStats[key];
                     const slaColor = s.sla <= 5 ? 'text-emerald-600 bg-emerald-50' : (s.sla <= 7 ? 'text-amber-600 bg-amber-50' : 'text-rose-600 bg-rose-50');
                     const slaBadge = `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold ${slaColor}">${s.sla} Hari</span>`;
 
+                    let borderClass = 'border-b border-slate-100';
+                    if (i === rowCount - 1) {
+                        borderClass = 'border-b-4 border-slate-200';
+                    }
+
                     const tr = document.createElement('tr');
-                    tr.className = `${groupBgClass} hover:bg-indigo-50/10 transition-colors border-b border-slate-100`;
+                    tr.className = `${groupClass} hover:bg-indigo-50/10 transition-colors ${borderClass}`;
                     
                     let html = '';
 
                     if (i === 0) {
                         html += `
+                            <td class="px-6 py-4 align-middle border-r border-slate-100 whitespace-nowrap bg-indigo-50/30 font-bold text-indigo-900" rowspan="${rowCount}">
+                                ${group.handoverDate}
+                            </td>
                             <td class="px-6 py-4 align-middle border-r border-slate-100 whitespace-nowrap" rowspan="${rowCount}">
                                 <div class="font-bold text-slate-700">${group.receiveDate}</div>
                                 <div class="text-xs text-slate-400 font-mono mt-1 bg-slate-200/50 inline-block px-1.5 py-0.5 rounded">${group.receiveTime}</div>
