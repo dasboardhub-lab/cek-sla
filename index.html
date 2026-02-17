@@ -638,6 +638,7 @@
                     inp.classList.remove('bg-slate-100', 'cursor-pointer');
                     inp.classList.add('bg-white');
                     inp.placeholder = "Tulis kendala...";
+                    // Remove click listener to prevent reopening modal
                     inp.onclick = null;
                 });
 
@@ -664,7 +665,7 @@
             return isNaN(date.getTime()) ? null : date;
         }
 
-        // --- HANDOVER LOGIC ---
+        // --- NEW LOGIC: HANDOVER DATE ---
         function getHandoverDateObj(receiveDateStr, timeStr) {
             if (!receiveDateStr) return null;
             const d = parseDate(receiveDateStr);
@@ -677,6 +678,7 @@
             return d;
         }
 
+        // Helper untuk parse tanggal + jam menjadi Date Object untuk sorting presisi
         function getFullReceiveDateObj(dateStr, timeStr) {
             if (!dateStr) return null;
             const d = parseDate(dateStr);
@@ -719,12 +721,6 @@
             return "Lainnya";
         }
 
-        // --- NEW AUTO-RESIZE FUNCTION ---
-        window.autoResize = function(el) {
-            el.style.height = 'auto'; // Reset
-            el.style.height = el.scrollHeight + 'px'; // Set to scroll height
-        }
-
         window.processRawData = function(results) {
             const data = results.data;
             allProcessedData = [];
@@ -738,6 +734,7 @@
                 let dest = destRaw.toUpperCase().trim();
                 if (dest === 'PALANGKARAYA' || dest === 'BANJAR MASIN') dest = 'BANJARMASIN';
 
+                // --- SLA LOGIC (PA to Handover) ---
                 const paDateObj = parseDate(paDateStr);
                 const handoverDateObj = getHandoverDateObj(receiveDateStr, timeStr);
                 const sla = calculateDiffDays(paDateObj, handoverDateObj);
@@ -907,7 +904,6 @@
         function renderRawTable(data) {
             const tbody = document.getElementById('tableBody'); tbody.innerHTML = '';
             const groups = {};
-            
             data.forEach(row => {
                 const k = `NOTE_${(row['FLIGHT']||'NA').replace(/\W/g,'')}_${(row['VENDOR']||'').replace(/\W/g,'')}_${row.destNormalized}_${(row['Tanggal DIterima']||row['Tanggal Diterima']||'-').replace(/\W/g,'')}_${(row['JAM']||'-').replace(/\W/g,'')}`;
                 
@@ -939,8 +935,10 @@
 
             // --- 1. CLUSTERING LOGIC: Group by Destinasi + Handover Date ---
             const clusterMap = {};
+            
             Object.values(groups).forEach(arrival => {
                 const clusterKey = `${arrival.handoverDate}||${arrival.dest}`;
+                
                 if (!clusterMap[clusterKey]) {
                     clusterMap[clusterKey] = {
                         dest: arrival.dest,
@@ -953,6 +951,7 @@
             });
 
             // --- 2. SORT CLUSTERS ---
+            // Urutan: Handover Date (Terbaru) -> Destinasi (A-Z)
             const sortedClusters = Object.values(clusterMap).sort((a,b) => {
                 const hA = a.handoverDateObj || new Date(0);
                 const hB = b.handoverDateObj || new Date(0);
@@ -968,39 +967,51 @@
 
             // --- 3. RENDER ---
             sortedClusters.forEach((cluster, cIndex) => {
+                // Sort Arrivals inside Cluster (Receive Date Desc)
                 cluster.arrivals.sort((a,b) => {
                     const rA = a.fullReceiveDateObj || new Date(0);
                     const rB = b.fullReceiveDateObj || new Date(0);
                     return rB - rA;
                 });
 
+                // Calculate total rows for this Cluster (for rowspan)
                 let totalClusterRows = 0;
                 cluster.arrivals.forEach(arr => {
                     totalClusterRows += Object.keys(arr.paStats).length;
                 });
 
                 cluster.arrivals.forEach((group, aIndex) => {
+                    // Sort PA Stats (Newest Date -> Smallest Batch)
                     const paKeys = Object.keys(group.paStats).sort((a,b) => {
                         const paA = group.paStats[a];
                         const paB = group.paStats[b];
                         const dateA = parseDate(paA.date) || new Date(0);
                         const dateB = parseDate(paB.date) || new Date(0);
+                        
                         if (dateB - dateA !== 0) return dateB - dateA; // Date Desc
                         return paA.batch.localeCompare(paB.batch, undefined, {numeric: true}); // Batch Asc
                     });
 
                     const arrivalRows = paKeys.length;
                     const noteValue = globalNotes[group.rawKey] || "";
+                    
                     const readOnlyAttr = isAuthorized ? '' : 'readonly';
                     const lockClass = isAuthorized ? 'bg-white' : 'bg-slate-100 cursor-pointer';
                     const placeholder = isAuthorized ? 'Tulis kendala...' : 'Klik untuk buka kunci...';
 
+                    // --- STYLING PEMISAH TANGGAL (UPDATED) ---
                     let groupClass = 'bg-white';
+                    
+                    // Cek jika ini adalah cluster baru (bukan yang pertama)
                     if (cIndex > 0 && aIndex === 0) {
                          const prevCluster = sortedClusters[cIndex-1];
+                         
+                         // Jika TANGGAL Handover berubah dari baris sebelumnya
                          if (prevCluster.handoverDate !== cluster.handoverDate) {
+                             // BERIKAN BATAS TEBAL & GELAP (Sepemrti permintaan: "lebih terang/jelas")
                              groupClass += " border-t-8 border-slate-300"; 
                          } else {
+                             // Jika Tanggal SAMA (hanya beda destinasi), batas biasa
                              groupClass += " border-t-2 border-slate-100"; 
                          }
                     }
@@ -1010,33 +1021,84 @@
                         const slaColor = s.sla <= 5 ? 'text-emerald-600 bg-emerald-50' : (s.sla <= 7 ? 'text-amber-600 bg-amber-50' : 'text-rose-600 bg-rose-50');
                         const slaBadge = `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold ${slaColor}">${s.sla} Hari</span>`;
                         
+                        // Border antar baris detail (PA) dalam satu grup shipment
                         let borderClass = 'border-b border-slate-100';
+                        
+                        // Terapkan border atas khusus untuk baris pertama dalam grup ini
                         let trClass = `${groupClass} hover:bg-indigo-50/10 transition-colors ${borderClass}`;
-                        if (i > 0) trClass = `bg-white hover:bg-indigo-50/10 transition-colors ${borderClass}`;
+                        if (i === 0) {
+                            // Baris pertama mengambil style groupClass yang sudah diset border tebalnya di atas
+                        } else {
+                            // Baris selanjutnya reset border atasnya
+                            trClass = `bg-white hover:bg-indigo-50/10 transition-colors ${borderClass}`;
+                        }
 
                         const tr = document.createElement('tr'); 
                         tr.className = trClass;
                         
                         let html = '';
 
+                        // 1. Handover SS (Cluster Rowspan)
                         if (aIndex === 0 && i === 0) {
-                            html += `<td class="px-6 py-4 align-middle border-r border-slate-100 whitespace-nowrap bg-indigo-50/30 font-bold text-indigo-900" rowspan="${totalClusterRows}">${group.handoverDate}</td>`;
+                            html += `
+                                <td class="px-6 py-4 align-middle border-r border-slate-100 whitespace-nowrap bg-indigo-50/30 font-bold text-indigo-900" rowspan="${totalClusterRows}">
+                                    ${group.handoverDate}
+                                </td>
+                            `;
                         }
 
+                        // 2. Waktu Terima (Arrival Rowspan)
                         if (i === 0) {
-                            html += `<td class="px-6 py-4 align-middle border-r border-slate-100 whitespace-nowrap" rowspan="${arrivalRows}"><div class="font-bold text-slate-700">${group.receiveDate}</div><div class="text-xs text-slate-400 font-mono mt-1 bg-slate-200/50 inline-block px-1.5 py-0.5 rounded">${group.receiveTime}</div></td>`;
+                            html += `
+                                <td class="px-6 py-4 align-middle border-r border-slate-100 whitespace-nowrap" rowspan="${arrivalRows}">
+                                    <div class="font-bold text-slate-700">${group.receiveDate}</div>
+                                    <div class="text-xs text-slate-400 font-mono mt-1 bg-slate-200/50 inline-block px-1.5 py-0.5 rounded">${group.receiveTime}</div>
+                                </td>
+                            `;
                         }
 
-                        html += `<td class="px-6 py-3 align-middle border-r border-slate-100 text-slate-600 font-medium whitespace-nowrap"><i class="far fa-calendar-alt text-indigo-400 mr-2"></i>${s.date}</td><td class="px-6 py-3 align-middle text-center border-r border-slate-100 whitespace-nowrap font-mono text-slate-600">${s.batch}</td><td class="px-6 py-3 align-middle text-right border-r border-slate-100 font-mono text-slate-600 whitespace-nowrap">${s.mb.toLocaleString('id-ID')}</td><td class="px-6 py-3 align-middle text-right border-r border-slate-100 font-mono text-slate-600 whitespace-nowrap">${s.qty.toLocaleString('id-ID')}</td><td class="px-6 py-3 align-middle text-center border-r border-slate-100 whitespace-nowrap">${slaBadge}</td>`;
+                        // 3-7. PA Stats (No Rowspan)
+                        html += `
+                            <td class="px-6 py-3 align-middle border-r border-slate-100 text-slate-600 font-medium whitespace-nowrap"><i class="far fa-calendar-alt text-indigo-400 mr-2"></i>${s.date}</td>
+                            <td class="px-6 py-3 align-middle text-center border-r border-slate-100 whitespace-nowrap font-mono text-slate-600">${s.batch}</td>
+                            <td class="px-6 py-3 align-middle text-right border-r border-slate-100 font-mono text-slate-600 whitespace-nowrap">${s.mb.toLocaleString('id-ID')}</td>
+                            <td class="px-6 py-3 align-middle text-right border-r border-slate-100 font-mono text-slate-600 whitespace-nowrap">${s.qty.toLocaleString('id-ID')}</td>
+                            <td class="px-6 py-3 align-middle text-center border-r border-slate-100 whitespace-nowrap">${slaBadge}</td>
+                        `;
 
+                        // 8-11. Shipment Info (Arrival Rowspan)
                         if (i === 0) {
-                            html += `<td class="px-6 py-4 align-middle border-r border-slate-100 font-bold text-indigo-700 whitespace-nowrap" rowspan="${arrivalRows}">${group.name}</td><td class="px-6 py-4 align-middle border-r border-slate-100 text-slate-600 font-medium whitespace-nowrap" rowspan="${arrivalRows}">${group.vendor}</td>`;
+                            html += `
+                                <td class="px-6 py-4 align-middle border-r border-slate-100 font-bold text-indigo-700 whitespace-nowrap" rowspan="${arrivalRows}">
+                                    ${group.name}
+                                </td>
+                                <td class="px-6 py-4 align-middle border-r border-slate-100 text-slate-600 font-medium whitespace-nowrap" rowspan="${arrivalRows}">
+                                    ${group.vendor}
+                                </td>
+                            `;
                             
                             if (aIndex === 0) {
-                                html += `<td class="px-6 py-4 align-middle border-r border-slate-100 whitespace-nowrap" rowspan="${totalClusterRows}"><span class="inline-flex items-center px-2.5 py-1 rounded text-xs font-bold bg-slate-200 text-slate-700">${group.dest}</span></td>`;
+                                html += `
+                                    <td class="px-6 py-4 align-middle border-r border-slate-100 whitespace-nowrap" rowspan="${totalClusterRows}">
+                                        <span class="inline-flex items-center px-2.5 py-1 rounded text-xs font-bold bg-slate-200 text-slate-700">
+                                            ${group.dest}
+                                        </span>
+                                    </td>
+                                `;
                             }
 
-                            html += `<td class="px-4 py-2 align-middle bg-yellow-50/30 border-l border-yellow-100" rowspan="${arrivalRows}"><textarea id="note-${group.rawKey}" ${readOnlyAttr} oninput="autoResize(this)" onclick="if(!isAuthorized) openAuthModal(this)" onchange="if(window.saveNoteToFirebase) window.saveNoteToFirebase('${group.rawKey}', this.value)" placeholder="${placeholder}" class="w-full h-auto min-h-[5rem] overflow-hidden ${lockClass} border border-slate-200 rounded-lg p-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent resize-none shadow-sm note-input">${noteValue}</textarea></td>`;
+                            html += `
+                                <td class="px-4 py-2 align-middle bg-yellow-50/30 border-l border-yellow-100" rowspan="${arrivalRows}">
+                                    <textarea 
+                                        id="note-${group.rawKey}" 
+                                        ${readOnlyAttr} 
+                                        onclick="if(!isAuthorized) openAuthModal(this)" 
+                                        onchange="if(window.saveNoteToFirebase) window.saveNoteToFirebase('${group.rawKey}', this.value)" 
+                                        placeholder="${placeholder}" 
+                                        class="w-full h-20 ${lockClass} border border-slate-200 rounded-lg p-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent resize-none shadow-sm note-input"
+                                    >${noteValue}</textarea>
+                                </td>
+                            `;
                         }
 
                         tr.innerHTML = html;
@@ -1044,8 +1106,6 @@
                     });
                 });
             });
-            // Initial resize for all textareas
-            document.querySelectorAll('#tableBody textarea').forEach(el => autoResize(el));
         }
     </script>
 </body>
