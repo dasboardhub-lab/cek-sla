@@ -63,6 +63,18 @@
                 <div class="space-y-2">
                     <div id="tableStagingContainer" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"></div>
                     <p class="text-xs text-slate-500 font-medium px-2">*) paket dengan resi Return (awb 5100xxx) tidak masuk dalam daftar tabel di atas</p>
+                    
+                    <div class="mx-2 mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100 text-xs text-slate-700">
+                        <p class="font-bold text-slate-800 mb-1.5">Panduan Membaca Tabel:</p>
+                        <ul class="list-disc pl-4 space-y-1">
+                            <li><b class="text-black-600">Estimasi</b> Estimasi inbound merupakan paket yang akan masuk di Tgl tersebut</li>
+                            <li><b class="text-red-600">After EDD</b> Paket sudah melewati batas waktu estimasi pengiriman</li>
+                            <li><b class="text-red-600">Last Day</b> Batas maksimal pengiriman paket adalah hari ini</li>
+                            <li><b class="text-yellow-600">Sameday</b> Waktu pengiriman tersisa 1 hingga 2 hari lagi</li>
+                            <li><b class="text-green-600">>2 Hari</b> Waktu pengiriman masih tersisa lebih dari 2 hari</li>
+                            <li><b class="text-purple-700">SLA MAX</b> Persentase total paket yang masih berstatus aman (jumlah paket Sameday dan >2 Hari dibagi Total keseluruhan paket)</li>
+                        </ul>
+                    </div>
                 </div>
                 <div class="space-y-8">
                     <div id="tableUzContainer" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"></div>
