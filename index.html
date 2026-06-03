@@ -39,7 +39,10 @@
                         <input type="checkbox" value="BPP" class="hub-filter rounded border-slate-300 text-blue-600 focus:ring-blue-500" checked> BPP
                     </label>
                     <label class="flex items-center gap-1.5 text-sm font-medium text-slate-700 cursor-pointer">
-                        <input type="checkbox" value="BJM & PLK" class="hub-filter rounded border-slate-300 text-blue-600 focus:ring-blue-500" checked> BJM & PLK
+                        <input type="checkbox" value="BJM" class="hub-filter rounded border-slate-300 text-blue-600 focus:ring-blue-500" checked> BJM
+                    </label>
+                    <label class="flex items-center gap-1.5 text-sm font-medium text-slate-700 cursor-pointer">
+                        <input type="checkbox" value="PLK" class="hub-filter rounded border-slate-300 text-blue-600 focus:ring-blue-500" checked> PLK
                     </label>
                     <label class="flex items-center gap-1.5 text-sm font-medium text-slate-700 cursor-pointer">
                         <input type="checkbox" value="MND" class="hub-filter rounded border-slate-300 text-blue-600 focus:ring-blue-500" checked> MND
@@ -135,7 +138,8 @@
         function getHubGroup(prefix) {
             if (prefix === "MKS") return "MKS";
             if (prefix === "BPP") return "BPP";
-            if (prefix === "BJM" || prefix === "PLK") return "BJM & PLK";
+            if (prefix === "BJM") return "BJM";
+            if (prefix === "PLK") return "PLK";
             if (prefix === "MND") return "MND";
             return "Gateway";
         }
@@ -243,6 +247,7 @@
                                 <th class="py-2 px-3 text-center text-yellow-600">Sameday</th>
                                 <th class="py-2 px-3 text-center text-green-600">>2 Hari</th>
                                 <th class="py-2 px-3 text-center text-blue-700">Total</th>
+                                <th class="py-2 px-3 text-center text-purple-700">SLA MAX</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y-2 divide-slate-200">
@@ -268,10 +273,11 @@
                     function getRank(name) {
                         if (name === 'MKS') return 1;
                         if (name === 'BPP') return 2;
-                        if (name === 'BJM & PLK') return 3;
-                        if (name === 'MND') return 4;
+                        if (name === 'BJM') return 3;
+                        if (name === 'PLK') return 4;
+                        if (name === 'MND') return 5;
                         if (name === 'Pickupan') return 1; 
-                        if (name === 'Gateway') return 5;
+                        if (name === 'Gateway') return 6;
                         return 9;
                     }
                     const rankA = getRank(a.part0);
@@ -287,7 +293,7 @@
                 rowData.forEach(r => rowSpans[r.part0] = (rowSpans[r.part0] || 0) + 1);
             }
 
-            const colSpan = isMultiCol ? 7 : 6;
+            const colSpan = isMultiCol ? 8 : 7;
             let renderedPart0 = {};
 
             if (rowData.length === 0) {
@@ -319,6 +325,7 @@
                             <td class="py-2 px-3 text-center text-yellow-600 font-medium bg-yellow-50/50">${row.same.toLocaleString('id-ID')}</td>
                             <td class="py-2 px-3 text-center text-green-600 font-medium bg-green-50/50">${row.more.toLocaleString('id-ID')}</td>
                             <td class="py-2 px-3 text-center font-bold text-slate-800">${row.total.toLocaleString('id-ID')}</td>
+                            <td class="py-2 px-3 text-center font-bold text-purple-700">${row.total > 0 ? (((row.same + row.more) / row.total) * 100).toFixed(2) + '%' : '0%'}</td>
                         </tr>
                     `;
                 }
@@ -336,6 +343,7 @@
                                 <td class="py-3 px-3 text-center text-yellow-600">${grandTotals["Sameday"].toLocaleString('id-ID')}</td>
                                 <td class="py-3 px-3 text-center text-green-600">${grandTotals[">2 Hari"].toLocaleString('id-ID')}</td>
                                 <td class="py-3 px-3 text-center text-blue-700">${grandTotals["Total"].toLocaleString('id-ID')}</td>
+                                <td class="py-3 px-3 text-center font-bold text-purple-700">${grandTotals["Total"] > 0 ? (((grandTotals["Sameday"] + grandTotals[">2 Hari"]) / grandTotals["Total"]) * 100).toFixed(2) + '%' : '0%'}</td>
                             </tr>
                         </tfoot>
                     </table>
