@@ -12,15 +12,19 @@
 
     <div class="w-full px-4 py-4">
         <div class="bg-white rounded-xl shadow-sm p-4 mb-6 border border-slate-200">
-            <h1 class="text-xl font-bold text-slate-900 mb-4">Dashboard Pantauan SLA</h1>
+            <h1 class="text-xl font-bold text-slate-900 mb-4">Dashboard Pantauan SLA & Container</h1>
             
             <div class="flex flex-col md:flex-row gap-4 items-end mb-4">
-                <div class="flex-grow">
-                    <label class="block text-xs font-medium text-slate-700 mb-1">Unggah Data (Bisa pilih 2-5 CSV)</label>
+                <div class="flex-grow w-full md:w-1/2">
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Unggah Data SLA (Bisa pilih 2-5 CSV)</label>
                     <input type="file" id="csvFileInput" accept=".csv" multiple class="block w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition-colors cursor-pointer border border-slate-300 rounded-md">
                 </div>
-                <div class="w-full md:w-auto flex gap-2">
-                    <button id="processBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-5 text-sm rounded-md transition-colors w-full">
+                <div class="flex-grow w-full md:w-1/2">
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Unggah Data Container (CSV opsional)</label>
+                    <input type="file" id="csvContainerInput" accept=".csv" multiple class="block w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 transition-colors cursor-pointer border border-slate-300 rounded-md">
+                </div>
+                <div class="w-full md:w-auto flex flex-col sm:flex-row gap-2">
+                    <button id="processBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-5 text-sm rounded-md transition-colors w-full whitespace-nowrap">
                         Proses Data
                     </button>
                     <button id="screenshotBtn" class="hidden bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-5 text-sm rounded-md transition-colors w-full whitespace-nowrap">
@@ -77,29 +81,72 @@
                     </div>
                 </div>
                 <div class="space-y-8">
-                    <div id="tableUzContainer" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"></div>
                     <div id="tableProdukContainer" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"></div>
+                    
+                    <!-- Tabel Baru untuk Container Sameday -->
+                    <div id="tableContainerSameday" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"></div>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        let globalData = [];
+        let globalSlaData = [];
+        let globalContainerData = [];
         let globalRefDate = new Date();
+
+        // Fungsi Global untuk menyalin teks ke clipboard
+        window.copyToClipboard = function(text, btnElement) {
+            // Mengubah format baris baru agar rapi di Excel/WA
+            const actualText = text.replace(/\\n/g, '\n');
+            const textarea = document.createElement('textarea');
+            textarea.value = actualText;
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                const originalHTML = btnElement.innerHTML;
+                btnElement.innerHTML = '<span class="text-emerald-600 font-bold text-xs whitespace-nowrap">✔ Tersalin!</span>';
+                setTimeout(() => {
+                    btnElement.innerHTML = originalHTML;
+                }, 2000);
+            } catch (err) {
+                console.error('Gagal menyalin', err);
+            }
+            document.body.removeChild(textarea);
+        };
 
         document.querySelectorAll('.hub-filter').forEach(cb => {
             cb.addEventListener('change', () => {
-                if (globalData.length > 0) {
+                if (globalSlaData.length > 0) {
                     applyFiltersAndRender();
                 }
             });
         });
 
+        function parseCSV(file) {
+            return new Promise((resolve) => {
+                Papa.parse(file, {
+                    delimiter: "|",
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: function(results) {
+                        resolve(results.data);
+                    },
+                    error: function(err) {
+                        console.error(err);
+                        resolve([]);
+                    }
+                });
+            });
+        }
+
         document.getElementById('processBtn').addEventListener('click', () => {
-            const fileInput = document.getElementById('csvFileInput');
-            if (!fileInput.files.length) {
-                alert('Pilih file CSV terlebih dahulu.');
+            const slaInput = document.getElementById('csvFileInput');
+            const containerInput = document.getElementById('csvContainerInput');
+            
+            if (!slaInput.files.length) {
+                alert('Pilih file CSV SLA terlebih dahulu.');
                 return;
             }
             
@@ -111,29 +158,15 @@
             document.getElementById('dashboardContent').classList.add('hidden');
             document.getElementById('screenshotBtn').classList.add('hidden');
 
-            const files = Array.from(fileInput.files);
-            const parsePromises = files.map(file => {
-                return new Promise((resolve) => {
-                    Papa.parse(file, {
-                        delimiter: "|",
-                        header: true,
-                        skipEmptyLines: true,
-                        complete: function(results) {
-                            resolve(results.data);
-                        },
-                        error: function(err) {
-                            console.error(err);
-                            resolve([]);
-                        }
-                    });
-                });
-            });
+            const slaPromises = Array.from(slaInput.files).map(file => parseCSV(file));
+            const containerPromises = Array.from(containerInput.files).map(file => parseCSV(file));
 
-            Promise.all(parsePromises).then(resultsArray => {
-                globalData = [];
-                resultsArray.forEach(data => {
-                    globalData = globalData.concat(data);
-                });
+            Promise.all([
+                Promise.all(slaPromises),
+                Promise.all(containerPromises)
+            ]).then(([slaResultsArray, containerResultsArray]) => {
+                globalSlaData = slaResultsArray.flat();
+                globalContainerData = containerResultsArray.flat();
                 applyFiltersAndRender();
             });
         });
@@ -143,7 +176,7 @@
             document.getElementById('dashboardContent').classList.add('hidden');
             
             setTimeout(() => {
-                processData(globalData, globalRefDate);
+                processData(globalSlaData, globalContainerData, globalRefDate);
             }, 50);
         }
 
@@ -156,23 +189,24 @@
             return "Gateway";
         }
 
-        function processData(data, refDate) {
+        function processData(slaData, containerData, refDate) {
             const selectedHubs = Array.from(document.querySelectorAll('.hub-filter:checked')).map(cb => cb.value);
 
             const stagingData = {};
             const produkData = {};
-            const originData = {};
+            
+            // Map untuk menyimpan status AWB Sameday & Last Day (Key: AWB, Value: true)
+            const awbTargetMap = new Map();
 
-            data.forEach(row => {
+            // 1. Proses Data SLA
+            slaData.forEach(row => {
                 const awb = row['awb_no'];
                 const staging = row['destination_staging'];
                 const produk = row['produk'];
                 const uz = row['destination_uz'];
-                const originUz = row['origin_uz'];
                 const eddRaw = row['expect_delivery_tm'];
 
                 if (!awb || !eddRaw) return;
-                
                 if (awb.startsWith('5100')) return;
 
                 const eddParts = eddRaw.split(' ')[0];
@@ -199,24 +233,18 @@
                 const destHub = getHubGroup(uzPrefix);
 
                 if (selectedHubs.includes(destHub)) {
+                    // Simpan data AWB yang berstatus Sameday atau Last Day
+                    if (category === "Sameday" || category === "Last Day") {
+                        awbTargetMap.set(awb, true);
+                    }
+
+                    // Mapping Staging Table
                     let stagingKey = destHub === "Gateway" ? "Gateway" : (staging || `${destHub} (Tanpa Staging)`);
                     const compKey = `${destHub}::${stagingKey}`;
                     if (!stagingData[compKey]) stagingData[compKey] = {};
                     stagingData[compKey][category] = (stagingData[compKey][category] || 0) + 1;
-                }
 
-                const originPrefix = originUz ? originUz.substring(0, 3) : "";
-                const originHub = getHubGroup(originPrefix);
-
-                if (selectedHubs.includes(originHub)) {
-                    let originKategori = originHub === "Gateway" ? "Gateway" : "Pickupan";
-                    let originSub = originHub === "Gateway" ? (produk || "Tanpa Produk") : originHub;
-                    const compKey = `${originKategori}::${originSub}`;
-                    if (!originData[compKey]) originData[compKey] = {};
-                    originData[compKey][category] = (originData[compKey][category] || 0) + 1;
-                }
-
-                if (selectedHubs.includes(destHub) || selectedHubs.includes(originHub)) {
+                    // Mapping Produk Table
                     if (produk) {
                         if (!produkData[produk]) produkData[produk] = {};
                         produkData[produk][category] = (produkData[produk][category] || 0) + 1;
@@ -224,11 +252,30 @@
                 }
             });
 
+            // 2. Proses Data Container khusus yang memiliki awb dengan status Sameday & Last Day
+            const containerTargetMap = {};
+
+            containerData.forEach(row => {
+                const awb = row['awb'];
+                const containerNo = row['container_no'];
+                const zoneCode = row['zone_code'];
+
+                if (awb && containerNo) {
+                    if (awbTargetMap.has(awb)) {
+                        if (!containerTargetMap[containerNo]) {
+                            containerTargetMap[containerNo] = { count: 0, zone: zoneCode || '-' };
+                        }
+                        containerTargetMap[containerNo].count += 1;
+                    }
+                }
+            });
+
             const dateStr = refDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
 
+            // Render tables
             renderTable('tableStagingContainer', stagingData, 'Estimasi Inbound Tgl ' + dateStr, 'Tujuan,Staging Destinasi');
             renderTable('tableProdukContainer', produkData, 'Service', 'Produk');
-            renderTable('tableUzContainer', originData, 'Origin', 'Kategori Origin,Produk');
+            renderContainerTable('tableContainerSameday', containerTargetMap, 'Data Container (Sameday & Last Day)');
 
             document.getElementById('loadingIndicator').classList.add('hidden');
             document.getElementById('dashboardContent').classList.remove('hidden');
@@ -288,7 +335,6 @@
                         if (name === 'BJM') return 3;
                         if (name === 'PLK') return 4;
                         if (name === 'MND') return 5;
-                        if (name === 'Pickupan') return 1; 
                         if (name === 'Gateway') return 6;
                         return 9;
                     }
@@ -365,6 +411,67 @@
             container.innerHTML = html;
         }
 
+        function renderContainerTable(containerId, dataObj, title) {
+            const container = document.getElementById(containerId);
+            
+            // Sort data berdasarkan jumlah resi sameday terbanyak
+            const sortedData = Object.entries(dataObj).sort((a, b) => b[1].count - a[1].count);
+            
+            // Menyiapkan teks seluruh container untuk fitur "Salin Semua"
+            const allContainersText = sortedData.map(item => item[0]).join('\\n');
+            
+            let html = `
+                <div class="p-4 border-b-2 border-slate-300 bg-white flex justify-between items-center">
+                    <h2 class="text-lg font-bold text-slate-800">${title}</h2>
+                    <div class="flex gap-2 items-center">
+                        ${sortedData.length > 0 ? `
+                        <button onclick="copyToClipboard('${allContainersText}', this)" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-3 py-1.5 rounded transition-colors flex items-center gap-1.5 border border-blue-200" title="Salin Semua ke Excel">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                            Salin Semua
+                        </button>` : ''}
+                        <span class="text-xs bg-yellow-100 text-yellow-800 font-bold px-2 py-1.5 rounded">Sameday & Last Day</span>
+                    </div>
+                </div>
+                <div class="max-h-96 overflow-y-auto">
+                    <table class="w-full text-left text-xs text-slate-600 relative">
+                        <thead class="bg-slate-50 text-slate-700 uppercase font-semibold border-b-2 border-slate-300 sticky top-0">
+                            <tr>
+                                <th class="py-2 px-3 w-1/2">No. Container</th>
+                                <th class="py-2 px-3">Zone Code</th>
+                                <th class="py-2 px-3 text-center">Jumlah Resi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y-2 divide-slate-200">
+            `;
+
+            if (sortedData.length === 0) {
+                html += `<tr><td colspan="3" class="py-6 text-center text-slate-500">Tidak ada Container dengan resi target.</td></tr>`;
+            } else {
+                for (const [containerNo, info] of sortedData) {
+                    html += `
+                        <tr class="hover:bg-slate-50 transition-colors group">
+                            <td class="py-2 px-3 font-medium text-slate-800 flex items-center justify-between">
+                                <span>${containerNo}</span>
+                                <button onclick="copyToClipboard('${containerNo}', this)" class="text-slate-400 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100" title="Salin nomor ini">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                </button>
+                            </td>
+                            <td class="py-2 px-3 font-medium text-slate-800">${info.zone}</td>
+                            <td class="py-2 px-3 text-center text-yellow-600 font-bold bg-yellow-50/50">${info.count.toLocaleString('id-ID')}</td>
+                        </tr>
+                    `;
+                }
+            }
+
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            container.innerHTML = html;
+        }
+
         document.getElementById('screenshotBtn').addEventListener('click', async () => {
             const btn = document.getElementById('screenshotBtn');
             const originalText = btn.innerText;
@@ -380,7 +487,7 @@
                 
                 const imgData = canvas.toDataURL('image/png');
                 const link = document.createElement('a');
-                link.download = `Dashboard-SLA-${new Date().toISOString().slice(0,10)}.png`;
+                link.download = `Dashboard-SLA-Container-${new Date().toISOString().slice(0,10)}.png`;
                 link.href = imgData;
                 link.click();
                 
