@@ -83,6 +83,13 @@
                     </label>
                 </div>
             </div>
+
+            <div class="pt-4 mt-4 border-t border-slate-200">
+                <label class="block text-xs font-medium text-slate-700 mb-2">Filter FOP (fop_code_internal):</label>
+                <div id="fopFilterContainer" class="flex flex-wrap gap-4 text-sm text-slate-500">
+                    <span class="italic text-xs">Pilih file SLA untuk memunculkan filter FOP secara otomatis...</span>
+                </div>
+            </div>
         </div>
 
         <div id="loadingIndicator" class="hidden text-center py-10">
@@ -90,6 +97,9 @@
         </div>
 
         <div id="dashboardContent" class="hidden">
+            <!-- Tabel Matriks FOP dipindah ke bagian atas (antara filter dan tabel utama) -->
+            <div id="tableFopContainer" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8"></div>
+
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
                 <div class="space-y-2">
                     <div id="tableStagingContainer" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"></div>
@@ -212,6 +222,33 @@
             ]).then(([slaResultsArray, containerResultsArray]) => {
                 globalSlaData = slaResultsArray.flat();
                 globalContainerData = containerResultsArray.flat();
+                
+                // Men-generate Checkbox Filter FOP secara Dinamis
+                const fopContainer = document.getElementById('fopFilterContainer');
+                const uniqueFops = [...new Set(globalSlaData.map(item => item['fop_code_internal'] ? item['fop_code_internal'].trim() : 'KOSONG'))]
+                                    .filter(val => val !== '').sort();
+                
+                if (uniqueFops.length > 0) {
+                    fopContainer.innerHTML = '';
+                    uniqueFops.forEach(fop => {
+                        const lbl = document.createElement('label');
+                        lbl.className = "flex items-center gap-1.5 text-sm font-medium text-slate-700 cursor-pointer";
+                        lbl.innerHTML = `<input type="checkbox" value="${fop}" class="fop-filter rounded border-slate-300 text-blue-600 focus:ring-blue-500" checked> ${fop}`;
+                        fopContainer.appendChild(lbl);
+                    });
+
+                    // Pasang event listener ke checkbox FOP yang baru dibuat
+                    document.querySelectorAll('.fop-filter').forEach(cb => {
+                        cb.addEventListener('change', () => {
+                            if (globalSlaData.length > 0) {
+                                applyFiltersAndRender();
+                            }
+                        });
+                    });
+                } else {
+                    fopContainer.innerHTML = '<span class="text-xs italic text-slate-500">Tidak ada kolom fop_code_internal ditemukan dalam file.</span>';
+                }
+
                 applyFiltersAndRender();
             });
         });
@@ -237,11 +274,13 @@
         function processData(slaData, containerData, refDate) {
             const selectedHubs = Array.from(document.querySelectorAll('.hub-filter:checked')).map(cb => cb.value);
             const selectedEdds = Array.from(document.querySelectorAll('.edd-filter:checked')).map(cb => cb.value);
+            const selectedFops = Array.from(document.querySelectorAll('.fop-filter:checked')).map(cb => cb.value);
 
             // Bersihkan data table awb pada load baru
             window.tableAwbs = {};
             const stagingData = {};
             const produkData = {};
+            const fopMatrixData = {};
             
             // Map untuk menyimpan status EDD AWB (Key: AWB, Value: kategori EDD)
             const awbTargetMap = new Map();
@@ -253,9 +292,13 @@
                 const produk = row['produk'];
                 const uz = row['destination_uz'];
                 const eddRaw = row['expect_delivery_tm'];
+                const fopRaw = row['fop_code_internal'] ? row['fop_code_internal'].trim() : 'KOSONG';
 
                 if (!awb || !eddRaw) return;
                 if (awb.startsWith('5100')) return;
+                
+                // Terapkan Filter FOP
+                if (selectedFops.length > 0 && !selectedFops.includes(fopRaw)) return;
 
                 const eddParts = eddRaw.split(' ')[0];
                 const edd = new Date(eddParts);
@@ -308,6 +351,11 @@
                             if (!produkData[produk][category]) produkData[produk][category] = [];
                             produkData[produk][category].push(awb);
                         }
+
+                        // Mapping FOP Matrix Table (Tujuan vs FOP)
+                        if (!fopMatrixData[destHub]) fopMatrixData[destHub] = {};
+                        if (!fopMatrixData[destHub][fopRaw]) fopMatrixData[destHub][fopRaw] = [];
+                        fopMatrixData[destHub][fopRaw].push(awb);
                     }
                 }
             });
@@ -359,6 +407,7 @@
             renderTable('tableStagingContainer', stagingData, 'Estimasi Inbound Tgl ' + dateStr, 'Tujuan,Staging Destinasi');
             renderTable('tableProdukContainer', produkData, 'Service', 'Produk');
             renderContainerTable('tableContainerSameday', containerTargetMap, 'Data Container (Sesuai Filter EDD)');
+            renderFopMatrixTable('tableFopContainer', fopMatrixData, 'Sebaran FOP berdasarkan Tujuan', selectedFops);
 
             document.getElementById('loadingIndicator').classList.add('hidden');
             document.getElementById('dashboardContent').classList.remove('hidden');
@@ -369,6 +418,9 @@
             const container = document.getElementById(containerId);
             const isMultiCol = rowLabel.includes(',');
             const labels = isMultiCol ? rowLabel.split(',') : [rowLabel];
+
+            // Inisialisasi wadah AWB untuk tabel ini
+            window.tableAwbs[containerId] = {};
 
             let thLabels = '';
             labels.forEach(lbl => {
@@ -445,10 +497,23 @@
             const colSpan = isMultiCol ? 8 : 7;
             let renderedPart0 = {};
 
+            // Helper untuk cell body dinamis
+            const makeBodyCell = (key, count, textCls, bgCls) => {
+                if (count === 0) return `<td class="py-2 px-3 text-center ${textCls} font-medium ${bgCls}">0</td>`;
+                return `
+                    <td class="py-2 px-3 text-center relative group cursor-pointer hover:bg-slate-200 transition-colors ${bgCls}" title="Salin resi">
+                        <span class="group-hover:opacity-0 transition-opacity block font-medium ${textCls}">${count.toLocaleString('id-ID')}</span>
+                        <button onclick="copyAwbs('${containerId}', '${key}', this)" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 bg-white border border-slate-300 ${textCls} px-2 py-1 rounded text-[10px] whitespace-nowrap shadow-sm hover:bg-slate-50 z-10 font-bold">Salin</button>
+                    </td>
+                `;
+            };
+
             if (rowData.length === 0) {
                 html += `<tr><td colspan="${colSpan}" class="py-6 text-center text-slate-500">Tidak ada data valid ditemukan.</td></tr>`;
             } else {
+                let rIdx = 0;
                 for (const row of rowData) {
+                    // Akumulasi total keseluruhan
                     grandTotalAwbs["After EDD"] = grandTotalAwbs["After EDD"].concat(row.afterArr);
                     grandTotalAwbs["Last Day"] = grandTotalAwbs["Last Day"].concat(row.lastArr);
                     grandTotalAwbs["Sameday"] = grandTotalAwbs["Sameday"].concat(row.sameArr);
@@ -460,6 +525,13 @@
                     grandTotals["Sameday"] += row.same;
                     grandTotals[">2 Hari"] += row.more;
                     grandTotals["Total"] += row.total;
+
+                    // Simpan memory awb untuk baris ini
+                    window.tableAwbs[containerId][`r${rIdx}_after`] = row.afterArr;
+                    window.tableAwbs[containerId][`r${rIdx}_last`] = row.lastArr;
+                    window.tableAwbs[containerId][`r${rIdx}_same`] = row.sameArr;
+                    window.tableAwbs[containerId][`r${rIdx}_more`] = row.moreArr;
+                    window.tableAwbs[containerId][`r${rIdx}_total`] = row.totalArr;
 
                     let tdLabels = '';
                     if (isMultiCol) {
@@ -475,19 +547,20 @@
                     html += `
                         <tr class="hover:bg-slate-50 transition-colors">
                             ${tdLabels}
-                            <td class="py-2 px-3 text-center text-red-600 font-medium bg-red-50/50">${row.after.toLocaleString('id-ID')}</td>
-                            <td class="py-2 px-3 text-center text-red-600 font-medium bg-red-50/50">${row.last.toLocaleString('id-ID')}</td>
-                            <td class="py-2 px-3 text-center text-yellow-600 font-medium bg-yellow-50/50">${row.same.toLocaleString('id-ID')}</td>
-                            <td class="py-2 px-3 text-center text-green-600 font-medium bg-green-50/50">${row.more.toLocaleString('id-ID')}</td>
-                            <td class="py-2 px-3 text-center font-bold text-slate-800">${row.total.toLocaleString('id-ID')}</td>
+                            ${makeBodyCell(`r${rIdx}_after`, row.after, 'text-red-600', 'bg-red-50/50')}
+                            ${makeBodyCell(`r${rIdx}_last`, row.last, 'text-red-600', 'bg-red-50/50')}
+                            ${makeBodyCell(`r${rIdx}_same`, row.same, 'text-yellow-600', 'bg-yellow-50/50')}
+                            ${makeBodyCell(`r${rIdx}_more`, row.more, 'text-green-600', 'bg-green-50/50')}
+                            ${makeBodyCell(`r${rIdx}_total`, row.total, 'text-slate-800', '')}
                             <td class="py-2 px-3 text-center font-bold text-purple-700">${row.total > 0 ? (((row.same + row.more) / row.total) * 100).toFixed(2) + '%' : '0%'}</td>
                         </tr>
                     `;
+                    rIdx++;
                 }
             }
 
-            // Simpan memory awb global
-            window.tableAwbs[containerId] = grandTotalAwbs;
+            // Gabungkan memory awb grand total ke memory awb global tabel
+            Object.assign(window.tableAwbs[containerId], grandTotalAwbs);
 
             // Helper untuk generate Cell tfoot dengan tombol hover
             const makeTfootCell = (cat, textClass, borderClass, bgHoverClass) => {
@@ -523,10 +596,14 @@
             container.innerHTML = html;
         }
 
+        // --- FUNGSI renderContainerTable ---
         function renderContainerTable(containerId, dataObj, title) {
             const container = document.getElementById(containerId);
             
-            // Sort data berdasarkan jumlah resi sameday terbanyak
+            // Inisialisasi wadah AWB untuk tabel ini
+            window.tableAwbs[containerId] = {};
+
+            // Sort data berdasarkan jumlah resi terbanyak
             const sortedData = Object.entries(dataObj).sort((a, b) => b[1].count - a[1].count);
             
             // Menyiapkan teks seluruh container untuk fitur "Salin Semua"
@@ -566,9 +643,21 @@
             let contGrandTotals = { '<0': 0, '0': 0, '1': 0, '2': 0, '3': 0, '4': 0, '>4': 0, 'Total': 0, 'TotalIsi': 0 };
             let contGrandTotalAwbs = { '<0': [], '0': [], '1': [], '2': [], '3': [], '4': [], '>4': [], 'Total': [] };
 
+            // Helper untuk cell body dinamis di tabel Container
+            const makeContBodyCell = (key, count, textCls, bgCls) => {
+                if (count === 0) return `<td class="py-2 px-2 text-center ${textCls} ${bgCls || ''}">0</td>`;
+                return `
+                    <td class="py-2 px-2 text-center relative group cursor-pointer hover:bg-slate-200 transition-colors ${bgCls || ''}" title="Salin resi">
+                        <span class="group-hover:opacity-0 transition-opacity block font-bold ${textCls}">${count.toLocaleString('id-ID')}</span>
+                        <button onclick="copyAwbs('${containerId}', '${key}', this)" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 bg-white border border-slate-300 ${textCls} px-2 py-1 rounded text-[10px] whitespace-nowrap shadow-sm hover:bg-slate-50 z-10 font-bold">Salin</button>
+                    </td>
+                `;
+            };
+
             if (sortedData.length === 0) {
                 html += `<tr><td colspan="10" class="py-6 text-center text-slate-500">Tidak ada Container dengan resi target.</td></tr>`;
             } else {
+                let rIdx = 0;
                 for (const [containerNo, info] of sortedData) {
                     const arrL = info.breakdown['<0'] || [];
                     const arr0 = info.breakdown['0'] || [];
@@ -610,6 +699,16 @@
                     contGrandTotals['Total'] += totalFilter;
                     contGrandTotals['TotalIsi'] += totalIsi;
 
+                    // Menyimpan data awb per baris
+                    window.tableAwbs[containerId][`r${rIdx}_<0`] = arrL;
+                    window.tableAwbs[containerId][`r${rIdx}_0`] = arr0;
+                    window.tableAwbs[containerId][`r${rIdx}_1`] = arr1;
+                    window.tableAwbs[containerId][`r${rIdx}_2`] = arr2;
+                    window.tableAwbs[containerId][`r${rIdx}_3`] = arr3;
+                    window.tableAwbs[containerId][`r${rIdx}_4`] = arr4;
+                    window.tableAwbs[containerId][`r${rIdx}_>4`] = arrM;
+                    window.tableAwbs[containerId][`r${rIdx}_Total`] = totalArr;
+
                     html += `
                         <tr class="hover:bg-slate-50 transition-colors group">
                             <td class="py-2 px-3 font-medium text-slate-800 flex items-center justify-between">
@@ -619,21 +718,22 @@
                                 </button>
                             </td>
                             <td class="py-2 px-2 text-center font-bold text-slate-800 bg-slate-200/60">${totalIsi.toLocaleString('id-ID')}</td>
-                            <td class="py-2 px-2 text-center ${cL > 0 ? 'text-red-600 font-bold bg-red-50/50' : 'text-slate-300'}">${cL}</td>
-                            <td class="py-2 px-2 text-center ${c0 > 0 ? 'text-blue-700 font-bold bg-blue-50/50' : 'text-slate-300'}">${c0}</td>
-                            <td class="py-2 px-2 text-center ${c1 > 0 ? 'text-blue-700 font-bold bg-blue-50/50' : 'text-slate-300'}">${c1}</td>
-                            <td class="py-2 px-2 text-center ${c2 > 0 ? 'text-blue-700 font-bold bg-blue-50/50' : 'text-slate-300'}">${c2}</td>
-                            <td class="py-2 px-2 text-center ${c3 > 0 ? 'text-blue-700 font-bold bg-blue-50/50' : 'text-slate-300'}">${c3}</td>
-                            <td class="py-2 px-2 text-center ${c4 > 0 ? 'text-blue-700 font-bold bg-blue-50/50' : 'text-slate-300'}">${c4}</td>
-                            <td class="py-2 px-2 text-center ${cM > 0 ? 'text-blue-700 font-bold bg-blue-50/50' : 'text-slate-300'}">${cM}</td>
-                            <td class="py-2 px-2 text-center font-bold text-slate-800 bg-slate-100">${totalFilter.toLocaleString('id-ID')}</td>
+                            ${makeContBodyCell(`r${rIdx}_<0`, cL, 'text-red-600', 'bg-red-50/50')}
+                            ${makeContBodyCell(`r${rIdx}_0`, c0, 'text-blue-700', 'bg-blue-50/50')}
+                            ${makeContBodyCell(`r${rIdx}_1`, c1, 'text-blue-700', 'bg-blue-50/50')}
+                            ${makeContBodyCell(`r${rIdx}_2`, c2, 'text-blue-700', 'bg-blue-50/50')}
+                            ${makeContBodyCell(`r${rIdx}_3`, c3, 'text-blue-700', 'bg-blue-50/50')}
+                            ${makeContBodyCell(`r${rIdx}_4`, c4, 'text-blue-700', 'bg-blue-50/50')}
+                            ${makeContBodyCell(`r${rIdx}_>4`, cM, 'text-blue-700', 'bg-blue-50/50')}
+                            ${makeContBodyCell(`r${rIdx}_Total`, totalFilter, 'text-slate-800', 'bg-slate-100')}
                         </tr>
                     `;
+                    rIdx++;
                 }
             }
 
-            // Simpan memory awb untuk tabel container
-            window.tableAwbs[containerId] = contGrandTotalAwbs;
+            // Simpan memory awb untuk grand total tabel container
+            Object.assign(window.tableAwbs[containerId], contGrandTotalAwbs);
 
             // Helper untuk generate Cell tfoot dengan tombol hover di tabel container
             const makeContTfootCell = (cat, textClass, borderClass, bgHoverClass) => {
@@ -664,6 +764,154 @@
                                 ${makeContTfootCell('4', 'text-blue-700', 'border-blue-300', 'hover:bg-blue-50')}
                                 ${makeContTfootCell('>4', 'text-blue-700', 'border-blue-300', 'hover:bg-blue-50')}
                                 ${makeContTfootCell('Total', 'text-slate-800', 'border-slate-300', 'hover:bg-slate-100')}
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            `;
+
+            container.innerHTML = html;
+        }
+
+        function renderFopMatrixTable(containerId, dataObj, title, fopColumns) {
+            const container = document.getElementById(containerId);
+            
+            // Inisialisasi wadah AWB untuk tabel ini
+            window.tableAwbs[containerId] = {};
+            
+            const sortedCols = [...fopColumns].sort(); // Urutkan nama kolom FOP secara alfabetis
+
+            let html = `
+                <div class="p-4 border-b-2 border-slate-300 bg-white">
+                    <h2 class="text-lg font-bold text-slate-800">${title}</h2>
+                </div>
+                <div class="overflow-x-auto max-h-96">
+                    <table class="w-full text-left text-xs text-slate-600 relative">
+                        <thead class="bg-slate-50 text-slate-700 uppercase font-semibold border-b-2 border-slate-300 sticky top-0 z-10">
+                            <tr>
+                                <th class="py-2 px-3 whitespace-nowrap border-r border-slate-200">Tujuan</th>
+            `;
+
+            sortedCols.forEach(col => {
+                html += `<th class="py-2 px-2 text-center text-blue-700">${col}</th>`;
+            });
+
+            html += `
+                                <th class="py-2 px-2 text-center text-slate-800">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y-2 divide-slate-200">
+            `;
+
+            let grandTotals = { Total: 0 };
+            let grandTotalAwbs = { Total: [] };
+            sortedCols.forEach(col => {
+                grandTotals[col] = 0;
+                grandTotalAwbs[col] = [];
+            });
+
+            let rowData = [];
+            for (const hub in dataObj) {
+                const row = dataObj[hub];
+                let rowTotalArr = [];
+                let rowCols = {};
+
+                sortedCols.forEach(col => {
+                    const arr = row[col] || [];
+                    rowCols[col] = { count: arr.length, awbs: arr };
+                    rowTotalArr = rowTotalArr.concat(arr);
+                });
+
+                rowData.push({ hub, rowCols, total: rowTotalArr.length, totalArr: rowTotalArr });
+            }
+
+            // Urutkan berdasarkan priority hub (MKS, BPP, dll)
+            rowData.sort((a, b) => {
+                function getRank(name) {
+                    if (name === 'MKS') return 1;
+                    if (name === 'BPP') return 2;
+                    if (name === 'BJM') return 3;
+                    if (name === 'PLK') return 4;
+                    if (name === 'MND') return 5;
+                    if (name === 'Gateway') return 6;
+                    return 9;
+                }
+                return getRank(a.hub) - getRank(b.hub);
+            });
+
+            if (rowData.length === 0) {
+                html += `<tr><td colspan="${sortedCols.length + 2}" class="py-6 text-center text-slate-500">Tidak ada data.</td></tr>`;
+            } else {
+                let rIdx = 0;
+                for (const row of rowData) {
+                    html += `<tr class="hover:bg-slate-50 transition-colors">
+                                <td class="py-2 px-3 font-medium text-slate-800 whitespace-nowrap border-r border-slate-200">${row.hub}</td>`;
+
+                    sortedCols.forEach(col => {
+                        const cell = row.rowCols[col];
+                        grandTotals[col] += cell.count;
+                        grandTotalAwbs[col] = grandTotalAwbs[col].concat(cell.awbs);
+                        
+                        // Menyimpan memori awb per cell
+                        window.tableAwbs[containerId][`r${rIdx}_${col}`] = cell.awbs;
+                        
+                        if (cell.count === 0) {
+                            html += `<td class="py-2 px-2 text-center text-slate-300">0</td>`;
+                        } else {
+                            html += `
+                                <td class="py-2 px-2 text-center relative group cursor-pointer hover:bg-slate-200 transition-colors bg-blue-50/50" title="Salin resi">
+                                    <span class="group-hover:opacity-0 transition-opacity block font-bold text-blue-700">${cell.count.toLocaleString('id-ID')}</span>
+                                    <button onclick="copyAwbs('${containerId}', 'r${rIdx}_${col}', this)" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 bg-white border border-slate-300 text-blue-700 px-2 py-1 rounded text-[10px] whitespace-nowrap shadow-sm hover:bg-slate-50 z-10 font-bold">Salin</button>
+                                </td>`;
+                        }
+                    });
+
+                    grandTotals.Total += row.total;
+                    grandTotalAwbs.Total = grandTotalAwbs.Total.concat(row.totalArr);
+                    
+                    window.tableAwbs[containerId][`r${rIdx}_Total`] = row.totalArr;
+
+                    if (row.total === 0) {
+                        html += `<td class="py-2 px-2 text-center font-bold text-slate-800 bg-slate-100">0</td></tr>`;
+                    } else {
+                        html += `
+                            <td class="py-2 px-2 text-center relative group cursor-pointer hover:bg-slate-200 transition-colors bg-slate-100" title="Salin resi">
+                                <span class="group-hover:opacity-0 transition-opacity block font-bold text-slate-800">${row.total.toLocaleString('id-ID')}</span>
+                                <button onclick="copyAwbs('${containerId}', 'r${rIdx}_Total', this)" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 bg-white border border-slate-300 text-slate-800 px-2 py-1 rounded text-[10px] whitespace-nowrap shadow-sm hover:bg-slate-50 z-10 font-bold">Salin</button>
+                            </td></tr>`;
+                    }
+                    rIdx++;
+                }
+            }
+
+            // Simpan data AWB matriks grand total ke window untuk dicopy
+            Object.assign(window.tableAwbs[containerId], grandTotalAwbs);
+
+            const makeTfootCell = (cat, textClass, borderClass, bgHoverClass) => {
+                const count = grandTotals[cat];
+                if (count === 0) return `<td class="py-3 px-2 text-center ${textClass}">0</td>`;
+                return `
+                    <td class="py-3 px-2 text-center relative group cursor-pointer hover:bg-slate-200 transition-colors" title="Salin semua resi untuk ${cat}">
+                        <span class="group-hover:opacity-0 transition-opacity block font-bold ${textClass}">${count.toLocaleString('id-ID')}</span>
+                        <button onclick="copyAwbs('${containerId}', '${cat}', this)" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 bg-white border ${borderClass} ${textClass} px-2 py-1 rounded text-[10px] whitespace-nowrap shadow-sm ${bgHoverClass} z-10 font-bold">Salin Resi</button>
+                    </td>
+                `;
+            };
+
+            html += `
+                        </tbody>
+                        <tfoot class="bg-slate-50 font-bold text-slate-800 border-t border-slate-200">
+                            <tr>
+                                <td class="py-3 px-3 border-r border-slate-200">Total Keseluruhan</td>
+            `;
+
+            sortedCols.forEach(col => {
+                html += makeTfootCell(col, 'text-blue-700', 'border-blue-300', 'hover:bg-blue-50');
+            });
+
+            html += makeTfootCell('Total', 'text-slate-800', 'border-slate-300', 'hover:bg-slate-100');
+
+            html += `
                             </tr>
                         </tfoot>
                     </table>
