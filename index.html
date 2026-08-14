@@ -1,10 +1,13 @@
+<!-- Chosen Palette: Slate & Indigo Executive -->
+<!-- Application Structure Plan: Interactive dashboard designed for tracking Hub SLA and Container distribution. Includes flexible CSV uploader supporting auto-detection of delimiters and mapping for both new (awb, service_code, destination_hub, latest_op_code) and old header formats. Structure features a Header control bar, Filter panel for Hubs, EDD, and FOPs, FOP Matrix Summary, Inbound Estimates, Service breakdown, and Container breakdown with instant copy-to-clipboard functionality. -->
+<!-- Visualization & Content Choices: Uses dynamic HTML tables with Tailwind responsive layouts, visual color-coded badges for SLA windows, and status indicators. All SVG icons replaced with Unicode/HTML elements for zero-dependency lightness. NO SVG or Mermaid JS used. -->
+<!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard SLA Staging & Produk</title>
-    <!-- Font Inter untuk tampilan lebih profesional -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
@@ -22,13 +25,10 @@
         }
     </script>
     <style>
-        /* Custom scrollbar untuk tabel */
         .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-        
-        /* Animasi fade in */
         .fade-in { animation: fadeIn 0.3s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
     </style>
@@ -37,12 +37,11 @@
 
     <div class="max-w-[1600px] mx-auto px-4 sm:px-6 py-6">
         
-        <!-- Header & Upload Section -->
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6 fade-in">
             <div class="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
                 <div class="flex items-center gap-4">
-                    <div class="bg-gradient-to-br from-brand-500 to-indigo-600 p-3 rounded-xl shadow-md text-white">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                    <div class="bg-gradient-to-br from-brand-500 to-indigo-600 p-3 rounded-xl shadow-md text-white text-xl font-extrabold flex items-center justify-center w-12 h-12">
+                        📊
                     </div>
                     <div>
                         <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Dashboard Pantauan SLA & Container</h1>
@@ -51,41 +50,37 @@
                 </div>
                 <div class="flex gap-3 w-full md:w-auto">
                     <button id="processBtn" class="flex-1 md:flex-none bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 px-6 rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        Proses Data
+                        <span>▶</span> Proses Data
                     </button>
                     <button id="screenshotBtn" class="hidden flex-1 md:flex-none bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-6 rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                        Unduh
+                        <span>📥</span> Unduh Gambar
                     </button>
                 </div>
             </div>
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- Custom File Input SLA -->
                 <div class="relative group">
                     <input type="file" id="csvFileInput" accept=".csv" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
                     <div class="flex items-center justify-between px-4 py-3.5 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50/50 group-hover:border-brand-500 group-hover:bg-brand-50 transition-all">
                         <div class="flex items-center gap-3.5">
-                            <div class="bg-white p-2.5 rounded-lg shadow-sm text-brand-600 border border-slate-200 group-hover:border-brand-200">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            <div class="bg-white p-2.5 rounded-lg shadow-sm text-brand-600 border border-slate-200 group-hover:border-brand-200 text-lg">
+                                📋
                             </div>
                             <div>
                                 <p class="text-sm font-bold text-slate-700 group-hover:text-brand-700">1. Unggah Data SLA</p>
-                                <p id="slaFileLabel" class="text-xs text-slate-500 font-medium mt-0.5">Mendukung 2-5 file CSV</p>
+                                <p id="slaFileLabel" class="text-xs text-slate-500 font-medium mt-0.5">Mendukung format lama & format baru (awb, service_code, destination_hub, latest_op_code)</p>
                             </div>
                         </div>
                         <span class="text-[11px] font-bold uppercase tracking-wider bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg group-hover:bg-brand-600 group-hover:text-white group-hover:border-brand-600 transition-colors">Pilih File</span>
                     </div>
                 </div>
 
-                <!-- Custom File Input Container -->
                 <div class="relative group">
                     <input type="file" id="csvContainerInput" accept=".csv" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
                     <div class="flex items-center justify-between px-4 py-3.5 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50/50 group-hover:border-emerald-500 group-hover:bg-emerald-50 transition-all">
                         <div class="flex items-center gap-3.5">
-                            <div class="bg-white p-2.5 rounded-lg shadow-sm text-emerald-600 border border-slate-200 group-hover:border-emerald-200">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                            <div class="bg-white p-2.5 rounded-lg shadow-sm text-emerald-600 border border-slate-200 group-hover:border-emerald-200 text-lg">
+                                📦
                             </div>
                             <div>
                                 <p class="text-sm font-bold text-slate-700 group-hover:text-emerald-700">2. Unggah Data Container</p>
@@ -98,15 +93,12 @@
             </div>
         </div>
 
-        <!-- Filter Section -->
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8 fade-in">
             <h2 class="text-sm font-bold text-slate-900 mb-5 flex items-center gap-2">
-                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
-                Panel Filter Data
+                <span class="text-slate-400">⚙️</span> Panel Filter Data
             </h2>
             
             <div class="space-y-6">
-                <!-- Filter Hub -->
                 <div>
                     <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Area Hub Tujuan</label>
                     <div class="flex flex-wrap gap-2.5">
@@ -137,7 +129,6 @@
                     </div>
                 </div>
 
-                <!-- Filter EDD -->
                 <div>
                     <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Batas Waktu Pengiriman (EDD)</label>
                     <div class="flex flex-wrap gap-2.5">
@@ -172,9 +163,8 @@
                     </div>
                 </div>
 
-                <!-- Filter FOP -->
                 <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">FOP (Fop Code Internal)</label>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">FOP (Fop Code / Latest Op Code)</label>
                     <div id="fopFilterContainer" class="flex flex-wrap gap-2.5">
                         <div class="px-4 py-1.5 rounded-full border border-dashed border-slate-300 bg-slate-50 text-slate-400 font-medium text-xs">
                             Pilih file SLA untuk memunculkan filter otomatis...
@@ -184,17 +174,14 @@
             </div>
         </div>
 
-        <!-- Loading State -->
         <div id="loadingIndicator" class="hidden flex-col items-center justify-center py-16">
-            <svg class="animate-spin h-10 w-10 text-brand-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            <div class="animate-spin rounded-full h-10 w-10 border-4 border-brand-500 border-t-transparent mb-4"></div>
             <p class="text-slate-600 font-bold text-lg">Memproses Data...</p>
             <p class="text-slate-400 text-sm mt-1">Mengalkulasi matrik dan menyusun tabel</p>
         </div>
 
-        <!-- Dashboard Content -->
         <div id="dashboardContent" class="hidden fade-in space-y-8">
             
-            <!-- Tabel Matriks FOP -->
             <div id="tableFopContainer" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"></div>
 
             <div class="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
@@ -203,8 +190,7 @@
                     
                     <div class="bg-indigo-50/50 rounded-2xl border border-indigo-100 p-5">
                         <h3 class="font-bold text-indigo-900 mb-3 text-sm flex items-center gap-2">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                            Panduan Membaca Tabel
+                            <span>ℹ️</span> Panduan Membaca Tabel
                         </h3>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-4 text-xs">
                             <div class="flex items-start gap-2"><div class="w-2.5 h-2.5 rounded-full bg-slate-400 mt-0.5 shrink-0"></div><span class="text-slate-700"><b>Estimasi:</b> Paket yang diproses di Tgl tersebut</span></div>
@@ -232,13 +218,13 @@
         let globalRefDate = new Date();
         window.tableAwbs = {};
 
-        // Update UI File input text
         document.getElementById('csvFileInput').addEventListener('change', function(e) {
             const count = e.target.files.length;
-            document.getElementById('slaFileLabel').innerText = count > 0 ? `${count} file CSV terpilih` : 'Mendukung 2-5 file CSV';
+            document.getElementById('slaFileLabel').innerText = count > 0 ? `${count} file CSV terpilih` : 'Mendukung format lama & format baru';
             document.getElementById('slaFileLabel').classList.toggle('text-brand-600', count > 0);
             document.getElementById('slaFileLabel').classList.toggle('font-bold', count > 0);
         });
+
         document.getElementById('csvContainerInput').addEventListener('change', function(e) {
             const count = e.target.files.length;
             document.getElementById('containerFileLabel').innerText = count > 0 ? `${count} file CSV terpilih` : 'Opsional (File CSV)';
@@ -246,7 +232,6 @@
             document.getElementById('containerFileLabel').classList.toggle('font-bold', count > 0);
         });
 
-        // Copy to clipboard premium tooltip style
         window.copyToClipboard = function(text, btnElement) {
             const actualText = text.replace(/\\n/g, '\n');
             const textarea = document.createElement('textarea');
@@ -259,11 +244,11 @@
                 const isSalinSemua = originalHTML.includes('Salin Semua');
                 
                 if(isSalinSemua) {
-                    btnElement.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Tersalin!';
+                    btnElement.innerHTML = '✓ Tersalin!';
                     btnElement.classList.add('bg-emerald-600', 'text-white', 'border-emerald-600');
                     btnElement.classList.remove('bg-white', 'text-slate-600');
                 } else {
-                    btnElement.innerHTML = '<svg class="w-3 h-3 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Tersalin';
+                    btnElement.innerHTML = '✓ Tersalin';
                     btnElement.classList.add('bg-emerald-500', 'text-white', 'border-emerald-500');
                 }
                 
@@ -301,11 +286,44 @@
         function parseCSV(file) {
             return new Promise((resolve) => {
                 Papa.parse(file, {
-                    delimiter: "|", header: true, skipEmptyLines: true,
+                    header: true,
+                    skipEmptyLines: true,
+                    dynamicTyping: false,
                     complete: function(results) { resolve(results.data); },
                     error: function(err) { console.error(err); resolve([]); }
                 });
             });
+        }
+
+        function normalizeSlaRow(row) {
+            const clean = {};
+            for (let k in row) {
+                if (row.hasOwnProperty(k) && k) {
+                    clean[k.trim().toLowerCase()] = row[k] ? row[k].trim() : '';
+                }
+            }
+            return {
+                awb: clean['awb'] || clean['awb_no'] || '',
+                staging: clean['destination_staging'] || clean['staging'] || '',
+                produk: clean['service_code'] || clean['produk'] || clean['service'] || '',
+                uz: clean['destination_hub'] || clean['destination_uz'] || clean['hub'] || '',
+                edd: clean['expect_delivery_tm'] || clean['edd'] || '',
+                fop: clean['latest_op_code'] || clean['fop_code_internal'] || clean['fop'] || 'KOSONG'
+            };
+        }
+
+        function normalizeContainerRow(row) {
+            const clean = {};
+            for (let k in row) {
+                if (row.hasOwnProperty(k) && k) {
+                    clean[k.trim().toLowerCase()] = row[k] ? row[k].trim() : '';
+                }
+            }
+            return {
+                containerNo: clean['container_no'] || clean['container'] || '',
+                awb: clean['awb'] || clean['awb_no'] || '',
+                zoneCode: clean['zone_code'] || clean['zone'] || '-'
+            };
         }
 
         document.getElementById('processBtn').addEventListener('click', () => {
@@ -337,8 +355,8 @@
                 globalContainerData = containerResultsArray.flat();
                 
                 const fopContainer = document.getElementById('fopFilterContainer');
-                const uniqueFops = [...new Set(globalSlaData.map(item => item['fop_code_internal'] ? item['fop_code_internal'].trim() : 'KOSONG'))]
-                                    .filter(val => val !== '').sort();
+                const fopList = globalSlaData.map(item => normalizeSlaRow(item).fop);
+                const uniqueFops = [...new Set(fopList)].filter(val => val !== '').sort();
                 
                 if (uniqueFops.length > 0) {
                     fopContainer.innerHTML = '';
@@ -369,11 +387,12 @@
         }
 
         function getHubGroup(prefix) {
-            if (prefix === "MKS") return "MKS";
-            if (prefix === "BPP") return "BPP";
-            if (prefix === "BJM") return "BJM";
-            if (prefix === "PLK") return "PLK";
-            if (prefix === "MND") return "MND";
+            const p = prefix ? prefix.toUpperCase() : "";
+            if (p === "MKS") return "MKS";
+            if (p === "BPP") return "BPP";
+            if (p === "BJM") return "BJM";
+            if (p === "PLK") return "PLK";
+            if (p === "MND") return "MND";
             return "Gateway";
         }
 
@@ -388,13 +407,14 @@
             const fopMatrixData = {};
             const awbTargetMap = new Map();
 
-            slaData.forEach(row => {
-                const awb = row['awb_no'];
-                const staging = row['destination_staging'];
-                const produk = row['produk'];
-                const uz = row['destination_uz'];
-                const eddRaw = row['expect_delivery_tm'];
-                const fopRaw = row['fop_code_internal'] ? row['fop_code_internal'].trim() : 'KOSONG';
+            slaData.forEach(rawRow => {
+                const row = normalizeSlaRow(rawRow);
+                const awb = row.awb;
+                const staging = row.staging;
+                const produk = row.produk;
+                const uz = row.uz;
+                const eddRaw = row.edd;
+                const fopRaw = row.fop || 'KOSONG';
 
                 if (!awb || !eddRaw) return;
                 if (awb.startsWith('5100')) return;
@@ -439,17 +459,19 @@
             });
 
             const containerAbsoluteTotalMap = {};
-            containerData.forEach(row => {
-                const containerNo = row['container_no'];
-                const awb = row['awb'];
+            containerData.forEach(rawRow => {
+                const row = normalizeContainerRow(rawRow);
+                const containerNo = row.containerNo;
+                const awb = row.awb;
                 if (containerNo && awb) containerAbsoluteTotalMap[containerNo] = (containerAbsoluteTotalMap[containerNo] || 0) + 1;
             });
 
             const containerTargetMap = {};
-            containerData.forEach(row => {
-                const awb = row['awb'];
-                const containerNo = row['container_no'];
-                const zoneCode = row['zone_code'];
+            containerData.forEach(rawRow => {
+                const row = normalizeContainerRow(rawRow);
+                const awb = row.awb;
+                const containerNo = row.containerNo;
+                const zoneCode = row.zoneCode;
 
                 if (awb && containerNo && awbTargetMap.has(awb)) {
                     const eddCategory = awbTargetMap.get(awb);
@@ -477,7 +499,7 @@
             document.getElementById('screenshotBtn').classList.remove('hidden');
         }
 
-        const btnCopyTpl = (contId, key) => `<button onclick="copyAwbs('${contId}', '${key}', this)" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 bg-slate-800 text-white border border-slate-700 px-3 py-1.5 rounded shadow-xl z-10 font-semibold text-[10px] uppercase tracking-wide flex items-center transition-all transform scale-90 group-hover:scale-100"><svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>Salin</button>`;
+        const btnCopyTpl = (contId, key) => `<button onclick="copyAwbs('${contId}', '${key}', this)" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 bg-slate-800 text-white border border-slate-700 px-3 py-1.5 rounded shadow-xl z-10 font-semibold text-[10px] uppercase tracking-wide flex items-center transition-all transform scale-90 group-hover:scale-100">📋 Salin</button>`;
 
         function renderTable(containerId, dataObj, title, rowLabel) {
             const container = document.getElementById(containerId);
@@ -643,8 +665,7 @@
                     <div class="flex gap-3 items-center">
                         ${sortedData.length > 0 ? `
                         <button onclick="copyToClipboard('${allContainersText.replace(/\n/g, '\\n')}', this)" class="text-xs bg-white hover:bg-slate-50 text-slate-600 font-semibold px-3 py-1.5 rounded-lg border border-slate-300 shadow-sm transition-all flex items-center gap-1.5">
-                            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                            Salin Semua Container
+                            <span>📋</span> Salin Semua Container
                         </button>` : ''}
                     </div>
                 </div>
@@ -700,7 +721,7 @@
                             <td class="py-2.5 px-4 font-semibold text-slate-800 flex items-center justify-between group/row">
                                 <span class="font-mono">${containerNo}</span>
                                 <button onclick="copyToClipboard('${containerNo}', this)" class="text-slate-300 hover:text-brand-600 opacity-0 group-hover/row:opacity-100 transition-opacity" title="Salin nomor container">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                    📋
                                 </button>
                             </td>
                             <td class="py-2.5 px-2 text-center text-slate-500 font-semibold bg-slate-50/50">${info.totalAwbInContainer.toLocaleString('id-ID')}</td>
@@ -764,7 +785,7 @@
             let html = `
                 <div class="p-5 border-b border-slate-200 bg-white flex justify-between items-center">
                     <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
-                        <svg class="w-5 h-5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        <span class="text-brand-500">📈</span>
                         ${title}
                     </h2>
                 </div>
@@ -874,7 +895,7 @@
         document.getElementById('screenshotBtn').addEventListener('click', async () => {
             const btn = document.getElementById('screenshotBtn');
             const originalHTML = btn.innerHTML;
-            btn.innerHTML = '<svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Memproses...';
+            btn.innerHTML = 'Memproses...';
             
             const element = document.getElementById('dashboardContent');
             try {
@@ -884,7 +905,7 @@
                 link.href = canvas.toDataURL('image/png');
                 link.click();
                 
-                btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Diunduh';
+                btn.innerHTML = '✓ Diunduh';
                 setTimeout(() => btn.innerHTML = originalHTML, 3000);
             } catch (err) {
                 console.error(err);
