@@ -180,6 +180,15 @@
                         </div>
                     </div>
                 </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Service / Produk</label>
+                    <div id="produkFilterContainer" class="flex flex-wrap gap-2.5 max-h-40 overflow-y-auto custom-scrollbar p-1">
+                        <div class="px-4 py-1.5 rounded-full border border-dashed border-slate-300 bg-slate-50 text-slate-400 font-medium text-xs">
+                            Pilih file SLA untuk memunculkan filter otomatis...
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -284,7 +293,7 @@
         };
 
         const setupFilterListeners = () => {
-            document.querySelectorAll('.hub-filter, .edd-filter, .fop-filter, .staging-filter').forEach(cb => {
+            document.querySelectorAll('.hub-filter, .edd-filter, .fop-filter, .staging-filter, .produk-filter').forEach(cb => {
                 cb.addEventListener('change', () => {
                     if (globalSlaData.length > 0) applyFiltersAndRender();
                 });
@@ -397,6 +406,23 @@
                     });
                 }
 
+                const produkContainer = document.getElementById('produkFilterContainer');
+                const produkList = globalSlaData.map(item => normalizeSlaRow(item).produk || 'TANPA PRODUK');
+                const uniqueProduks = [...new Set(produkList)].sort();
+                
+                if (uniqueProduks.length > 0) {
+                    produkContainer.innerHTML = '';
+                    uniqueProduks.forEach(produk => {
+                        const lbl = document.createElement('label');
+                        lbl.className = "cursor-pointer group";
+                        lbl.innerHTML = `
+                            <input type="checkbox" value="${produk}" class="peer hidden produk-filter" checked>
+                            <div class="px-3 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-cyan-600 peer-checked:text-white peer-checked:border-cyan-600 hover:border-slate-300">${produk}</div>
+                        `;
+                        produkContainer.appendChild(lbl);
+                    });
+                }
+
                 setupFilterListeners();
 
                 applyFiltersAndRender();
@@ -428,6 +454,7 @@
             const selectedEdds = Array.from(document.querySelectorAll('.edd-filter:checked')).map(cb => cb.value);
             const selectedFops = Array.from(document.querySelectorAll('.fop-filter:checked')).map(cb => cb.value);
             const selectedStagings = Array.from(document.querySelectorAll('.staging-filter:checked')).map(cb => cb.value);
+            const selectedProduks = Array.from(document.querySelectorAll('.produk-filter:checked')).map(cb => cb.value);
 
             window.tableAwbs = {};
             const stagingData = {};
@@ -444,11 +471,13 @@
                 const eddRaw = row.edd;
                 const fopRaw = row.fop || 'KOSONG';
                 const stagingFilterVal = staging || 'TANPA STAGING';
+                const produkFilterVal = produk || 'TANPA PRODUK';
 
                 if (!awb || !eddRaw) return;
                 if (awb.startsWith('5100')) return;
                 if (selectedFops.length > 0 && !selectedFops.includes(fopRaw)) return;
                 if (selectedStagings.length > 0 && !selectedStagings.includes(stagingFilterVal)) return;
+                if (selectedProduks.length > 0 && !selectedProduks.includes(produkFilterVal)) return;
 
                 const eddParts = eddRaw.split(' ')[0];
                 const edd = new Date(eddParts);
