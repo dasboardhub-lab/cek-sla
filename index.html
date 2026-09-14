@@ -171,6 +171,15 @@
                         </div>
                     </div>
                 </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Staging Destinasi</label>
+                    <div id="stagingFilterContainer" class="flex flex-wrap gap-2.5 max-h-40 overflow-y-auto custom-scrollbar p-1">
+                        <div class="px-4 py-1.5 rounded-full border border-dashed border-slate-300 bg-slate-50 text-slate-400 font-medium text-xs">
+                            Pilih file SLA untuk memunculkan filter otomatis...
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -275,7 +284,7 @@
         };
 
         const setupFilterListeners = () => {
-            document.querySelectorAll('.hub-filter, .edd-filter, .fop-filter').forEach(cb => {
+            document.querySelectorAll('.hub-filter, .edd-filter, .fop-filter, .staging-filter').forEach(cb => {
                 cb.addEventListener('change', () => {
                     if (globalSlaData.length > 0) applyFiltersAndRender();
                 });
@@ -369,8 +378,26 @@
                         `;
                         fopContainer.appendChild(lbl);
                     });
-                    setupFilterListeners();
                 }
+
+                const stagingContainer = document.getElementById('stagingFilterContainer');
+                const stagingList = globalSlaData.map(item => normalizeSlaRow(item).staging || 'TANPA STAGING');
+                const uniqueStagings = [...new Set(stagingList)].sort();
+                
+                if (uniqueStagings.length > 0) {
+                    stagingContainer.innerHTML = '';
+                    uniqueStagings.forEach(staging => {
+                        const lbl = document.createElement('label');
+                        lbl.className = "cursor-pointer group";
+                        lbl.innerHTML = `
+                            <input type="checkbox" value="${staging}" class="peer hidden staging-filter" checked>
+                            <div class="px-3 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-teal-600 peer-checked:text-white peer-checked:border-teal-600 hover:border-slate-300">${staging}</div>
+                        `;
+                        stagingContainer.appendChild(lbl);
+                    });
+                }
+
+                setupFilterListeners();
 
                 applyFiltersAndRender();
             });
@@ -400,6 +427,7 @@
             const selectedHubs = Array.from(document.querySelectorAll('.hub-filter:checked')).map(cb => cb.value);
             const selectedEdds = Array.from(document.querySelectorAll('.edd-filter:checked')).map(cb => cb.value);
             const selectedFops = Array.from(document.querySelectorAll('.fop-filter:checked')).map(cb => cb.value);
+            const selectedStagings = Array.from(document.querySelectorAll('.staging-filter:checked')).map(cb => cb.value);
 
             window.tableAwbs = {};
             const stagingData = {};
@@ -415,10 +443,12 @@
                 const uz = row.uz;
                 const eddRaw = row.edd;
                 const fopRaw = row.fop || 'KOSONG';
+                const stagingFilterVal = staging || 'TANPA STAGING';
 
                 if (!awb || !eddRaw) return;
                 if (awb.startsWith('5100')) return;
                 if (selectedFops.length > 0 && !selectedFops.includes(fopRaw)) return;
+                if (selectedStagings.length > 0 && !selectedStagings.includes(stagingFilterVal)) return;
 
                 const eddParts = eddRaw.split(' ')[0];
                 const edd = new Date(eddParts);
