@@ -1,987 +1,905 @@
 <!-- Chosen Palette: Slate & Indigo Executive -->
-<!-- Application Structure Plan: Interactive dashboard designed for tracking Hub SLA and Container distribution. Includes flexible CSV uploader supporting auto-detection of delimiters and mapping for both new (awb, service_code, destination_hub, latest_op_code) and old header formats. Structure features a Header control bar, Filter panel for Hubs, EDD, and FOPs, FOP Matrix Summary, Inbound Estimates, Service breakdown, and Container breakdown with instant copy-to-clipboard functionality. -->
-<!-- Visualization & Content Choices: Uses dynamic HTML tables with Tailwind responsive layouts, visual color-coded badges for SLA windows, and status indicators. All SVG icons replaced with Unicode/HTML elements for zero-dependency lightness. NO SVG or Mermaid JS used. -->
-<!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard SLA Staging & Produk</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['Inter', 'sans-serif'] },
-                    colors: {
-                        brand: { 50: '#eff6ff', 100: '#dbeafe', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8' }
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-        .fade-in { animation: fadeIn 0.3s ease-in-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-    </style>
-</head>
-<body class="bg-slate-50 min-h-screen font-sans text-slate-800 pb-12">
-
-    <div class="max-w-[1600px] mx-auto px-4 sm:px-6 py-6">
-        
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6 fade-in">
-            <div class="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-                <div class="flex items-center gap-4">
-                    <div class="bg-gradient-to-br from-brand-500 to-indigo-600 p-3 rounded-xl shadow-md text-white text-xl font-extrabold flex items-center justify-center w-12 h-12">
-                        📊
-                    </div>
-                    <div>
-                        <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Dashboard Pantauan SLA & Container</h1>
-                        <p class="text-sm text-slate-500 font-medium mt-1">Sistem Pemantauan Performa Hub & Rincian Pengiriman</p>
-                    </div>
-                </div>
-                <div class="flex gap-3 w-full md:w-auto">
-                    <button id="processBtn" class="flex-1 md:flex-none bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 px-6 rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2">
-                        <span>▶</span> Proses Data
-                    </button>
-                    <button id="screenshotBtn" class="hidden flex-1 md:flex-none bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-6 rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2">
-                        <span>📥</span> Unduh Gambar
-                    </button>
-                </div>
-            </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="relative group">
-                    <input type="file" id="csvFileInput" accept=".csv" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
-                    <div class="flex items-center justify-between px-4 py-3.5 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50/50 group-hover:border-brand-500 group-hover:bg-brand-50 transition-all">
-                        <div class="flex items-center gap-3.5">
-                            <div class="bg-white p-2.5 rounded-lg shadow-sm text-brand-600 border border-slate-200 group-hover:border-brand-200 text-lg">
-                                📋
-                            </div>
-                            <div>
-                                <p class="text-sm font-bold text-slate-700 group-hover:text-brand-700">1. Unggah Data SLA</p>
-                                <p id="slaFileLabel" class="text-xs text-slate-500 font-medium mt-0.5">Mendukung format lama & format baru (awb, service_code, destination_hub, latest_op_code)</p>
-                            </div>
-                        </div>
-                        <span class="text-[11px] font-bold uppercase tracking-wider bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg group-hover:bg-brand-600 group-hover:text-white group-hover:border-brand-600 transition-colors">Pilih File</span>
-                    </div>
-                </div>
-
-                <div class="relative group">
-                    <input type="file" id="csvContainerInput" accept=".csv" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
-                    <div class="flex items-center justify-between px-4 py-3.5 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50/50 group-hover:border-emerald-500 group-hover:bg-emerald-50 transition-all">
-                        <div class="flex items-center gap-3.5">
-                            <div class="bg-white p-2.5 rounded-lg shadow-sm text-emerald-600 border border-slate-200 group-hover:border-emerald-200 text-lg">
-                                📦
-                            </div>
-                            <div>
-                                <p class="text-sm font-bold text-slate-700 group-hover:text-emerald-700">2. Unggah Data Container</p>
-                                <p id="containerFileLabel" class="text-xs text-slate-500 font-medium mt-0.5">Opsional (File CSV)</p>
-                            </div>
-                        </div>
-                        <span class="text-[11px] font-bold uppercase tracking-wider bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg group-hover:bg-emerald-600 group-hover:text-white group-hover:border-emerald-600 transition-colors">Pilih File</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8 fade-in">
-            <h2 class="text-sm font-bold text-slate-900 mb-5 flex items-center gap-2">
-                <span class="text-slate-400">⚙️</span> Panel Filter Data
-            </h2>
-            
-            <div class="space-y-6">
-                <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Area Hub Tujuan</label>
-                    <div class="flex flex-wrap gap-2.5">
-                        <label class="cursor-pointer group">
-                            <input type="checkbox" value="MKS" class="peer hidden hub-filter" checked>
-                            <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-slate-800 peer-checked:text-white peer-checked:border-slate-800 hover:border-slate-300">MKS</div>
-                        </label>
-                        <label class="cursor-pointer group">
-                            <input type="checkbox" value="BPP" class="peer hidden hub-filter" checked>
-                            <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-slate-800 peer-checked:text-white peer-checked:border-slate-800 hover:border-slate-300">BPP</div>
-                        </label>
-                        <label class="cursor-pointer group">
-                            <input type="checkbox" value="BJM" class="peer hidden hub-filter" checked>
-                            <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-slate-800 peer-checked:text-white peer-checked:border-slate-800 hover:border-slate-300">BJM</div>
-                        </label>
-                        <label class="cursor-pointer group">
-                            <input type="checkbox" value="PLK" class="peer hidden hub-filter" checked>
-                            <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-slate-800 peer-checked:text-white peer-checked:border-slate-800 hover:border-slate-300">PLK</div>
-                        </label>
-                        <label class="cursor-pointer group">
-                            <input type="checkbox" value="MND" class="peer hidden hub-filter" checked>
-                            <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-slate-800 peer-checked:text-white peer-checked:border-slate-800 hover:border-slate-300">MND</div>
-                        </label>
-                        <label class="cursor-pointer group">
-                            <input type="checkbox" value="PAL" class="peer hidden hub-filter" checked>
-                            <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-slate-800 peer-checked:text-white peer-checked:border-slate-800 hover:border-slate-300">PAL</div>
-                        </label>
-                        <label class="cursor-pointer group">
-                            <input type="checkbox" value="KDI" class="peer hidden hub-filter" checked>
-                            <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-slate-800 peer-checked:text-white peer-checked:border-slate-800 hover:border-slate-300">KDI</div>
-                        </label>
-                        <label class="cursor-pointer group">
-                            <input type="checkbox" value="Gateway" class="peer hidden hub-filter" checked>
-                            <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-slate-800 peer-checked:text-white peer-checked:border-slate-800 hover:border-slate-300">Gateway</div>
-                        </label>
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Batas Waktu Pengiriman (EDD)</label>
-                    <div class="flex flex-wrap gap-2.5">
-                        <label class="cursor-pointer group">
-                            <input type="checkbox" value="<0" class="peer hidden edd-filter" checked>
-                            <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-red-600 peer-checked:text-white peer-checked:border-red-600 hover:border-slate-300">Lewat SLA</div>
-                        </label>
-                        <label class="cursor-pointer group">
-                            <input type="checkbox" value="0" class="peer hidden edd-filter" checked>
-                            <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600 hover:border-slate-300">H+0</div>
-                        </label>
-                        <label class="cursor-pointer group">
-                            <input type="checkbox" value="1" class="peer hidden edd-filter" checked>
-                            <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600 hover:border-slate-300">H+1</div>
-                        </label>
-                        <label class="cursor-pointer group">
-                            <input type="checkbox" value="2" class="peer hidden edd-filter" checked>
-                            <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600 hover:border-slate-300">H+2</div>
-                        </label>
-                        <label class="cursor-pointer group">
-                            <input type="checkbox" value="3" class="peer hidden edd-filter" checked>
-                            <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600 hover:border-slate-300">H+3</div>
-                        </label>
-                        <label class="cursor-pointer group">
-                            <input type="checkbox" value="4" class="peer hidden edd-filter" checked>
-                            <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600 hover:border-slate-300">H+4</div>
-                        </label>
-                        <label class="cursor-pointer group">
-                            <input type="checkbox" value=">4" class="peer hidden edd-filter" checked>
-                            <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600 hover:border-slate-300">&gt;H+4</div>
-                        </label>
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">FOP (Fop Code / Latest Op Code)</label>
-                    <div id="fopFilterContainer" class="flex flex-wrap gap-2.5">
-                        <div class="px-4 py-1.5 rounded-full border border-dashed border-slate-300 bg-slate-50 text-slate-400 font-medium text-xs">
-                            Pilih file SLA untuk memunculkan filter otomatis...
-                        </div>
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Staging Destinasi</label>
-                    <div id="stagingFilterContainer" class="flex flex-wrap gap-2.5 max-h-40 overflow-y-auto custom-scrollbar p-1">
-                        <div class="px-4 py-1.5 rounded-full border border-dashed border-slate-300 bg-slate-50 text-slate-400 font-medium text-xs">
-                            Pilih file SLA untuk memunculkan filter otomatis...
-                        </div>
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Service / Produk</label>
-                    <div id="produkFilterContainer" class="flex flex-wrap gap-2.5 max-h-40 overflow-y-auto custom-scrollbar p-1">
-                        <div class="px-4 py-1.5 rounded-full border border-dashed border-slate-300 bg-slate-50 text-slate-400 font-medium text-xs">
-                            Pilih file SLA untuk memunculkan filter otomatis...
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div id="loadingIndicator" class="hidden flex-col items-center justify-center py-16">
-            <div class="animate-spin rounded-full h-10 w-10 border-4 border-brand-500 border-t-transparent mb-4"></div>
-            <p class="text-slate-600 font-bold text-lg">Memproses Data...</p>
-            <p class="text-slate-400 text-sm mt-1">Mengalkulasi matrik dan menyusun tabel</p>
-        </div>
-
-        <div id="dashboardContent" class="hidden fade-in space-y-8">
-            
-            <div id="tableFopContainer" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"></div>
-
-            <div class="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
-                <div class="space-y-6">
-                    <div id="tableStagingContainer" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"></div>
-                    
-                    <div class="bg-indigo-50/50 rounded-2xl border border-indigo-100 p-5">
-                        <h3 class="font-bold text-indigo-900 mb-3 text-sm flex items-center gap-2">
-                            <span>ℹ️</span> Panduan Membaca Tabel
-                        </h3>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-4 text-xs">
-                            <div class="flex items-start gap-2"><div class="w-2.5 h-2.5 rounded-full bg-slate-400 mt-0.5 shrink-0"></div><span class="text-slate-700"><b>Estimasi:</b> Paket yang diproses di Tgl tersebut</span></div>
-                            <div class="flex items-start gap-2"><div class="w-2.5 h-2.5 rounded-full bg-red-600 mt-0.5 shrink-0"></div><span class="text-slate-700"><b>After EDD:</b> Melewati batas waktu pengiriman</span></div>
-                            <div class="flex items-start gap-2"><div class="w-2.5 h-2.5 rounded-full bg-orange-500 mt-0.5 shrink-0"></div><span class="text-slate-700"><b>Last Day:</b> Batas maksimal hari ini</span></div>
-                            <div class="flex items-start gap-2"><div class="w-2.5 h-2.5 rounded-full bg-amber-400 mt-0.5 shrink-0"></div><span class="text-slate-700"><b>Sameday:</b> Sisa waktu 1 - 2 hari lagi</span></div>
-                            <div class="flex items-start gap-2"><div class="w-2.5 h-2.5 rounded-full bg-emerald-500 mt-0.5 shrink-0"></div><span class="text-slate-700"><b>>2 Hari:</b> Sisa waktu lebih dari 2 hari</span></div>
-                            <div class="flex items-start gap-2"><div class="w-2.5 h-2.5 rounded-full bg-purple-600 mt-0.5 shrink-0"></div><span class="text-slate-700"><b>SLA MAX:</b> Persentase paket berstatus aman</span></div>
-                        </div>
-                        <p class="text-[11px] text-indigo-500/80 font-medium mt-4 italic">*) Paket dengan resi Return (awb 5100xxx) dikecualikan dari tabel</p>
-                    </div>
-                </div>
-                
-                <div class="space-y-8">
-                    <div id="tableProdukContainer" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"></div>
-                    <div id="tableContainerSameday" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        let globalSlaData = [];
-        let globalContainerData = [];
-        let globalRefDate = new Date();
-        window.tableAwbs = {};
-
-        document.getElementById('csvFileInput').addEventListener('change', function(e) {
-            const count = e.target.files.length;
-            document.getElementById('slaFileLabel').innerText = count > 0 ? `${count} file CSV terpilih` : 'Mendukung format lama & format baru';
-            document.getElementById('slaFileLabel').classList.toggle('text-brand-600', count > 0);
-            document.getElementById('slaFileLabel').classList.toggle('font-bold', count > 0);
-        });
-
-        document.getElementById('csvContainerInput').addEventListener('change', function(e) {
-            const count = e.target.files.length;
-            document.getElementById('containerFileLabel').innerText = count > 0 ? `${count} file CSV terpilih` : 'Opsional (File CSV)';
-            document.getElementById('containerFileLabel').classList.toggle('text-emerald-600', count > 0);
-            document.getElementById('containerFileLabel').classList.toggle('font-bold', count > 0);
-        });
-
-        window.copyToClipboard = function(text, btnElement) {
-            const actualText = text.replace(/\\n/g, '\n');
-            const textarea = document.createElement('textarea');
-            textarea.value = actualText;
-            document.body.appendChild(textarea);
-            textarea.select();
-            try {
-                document.execCommand('copy');
-                const originalHTML = btnElement.innerHTML;
-                const isSalinSemua = originalHTML.includes('Salin Semua');
-                
-                if(isSalinSemua) {
-                    btnElement.innerHTML = '✓ Tersalin!';
-                    btnElement.classList.add('bg-emerald-600', 'text-white', 'border-emerald-600');
-                    btnElement.classList.remove('bg-white', 'text-slate-600');
-                } else {
-                    btnElement.innerHTML = '✓ Tersalin';
-                    btnElement.classList.add('bg-emerald-500', 'text-white', 'border-emerald-500');
-                }
-                
-                setTimeout(() => {
-                    btnElement.innerHTML = originalHTML;
-                    if(isSalinSemua) {
-                        btnElement.classList.remove('bg-emerald-600', 'text-white', 'border-emerald-600');
-                        btnElement.classList.add('bg-white', 'text-slate-600');
-                    } else {
-                        btnElement.classList.remove('bg-emerald-500', 'text-white', 'border-emerald-500');
-                    }
-                }, 2000);
-            } catch (err) {
-                console.error('Gagal menyalin', err);
-            }
-            document.body.removeChild(textarea);
-        };
-
-        window.copyAwbs = function(containerId, category, btnElement) {
-            const awbs = window.tableAwbs[containerId]?.[category] || [];
-            if (awbs.length === 0) return;
-            const text = awbs.join('\n');
-            window.copyToClipboard(text, btnElement);
-        };
-
-        const setupFilterListeners = () => {
-            document.querySelectorAll('.hub-filter, .edd-filter, .fop-filter, .staging-filter, .produk-filter').forEach(cb => {
-                cb.addEventListener('change', () => {
-                    if (globalSlaData.length > 0) applyFiltersAndRender();
-                });
-            });
-        };
-        setupFilterListeners();
-
-        function parseCSV(file) {
-            return new Promise((resolve) => {
-                Papa.parse(file, {
-                    header: true,
-                    skipEmptyLines: true,
-                    dynamicTyping: false,
-                    complete: function(results) { resolve(results.data); },
-                    error: function(err) { console.error(err); resolve([]); }
-                });
-            });
-        }
-
-        function normalizeSlaRow(row) {
-            const clean = {};
-            for (let k in row) {
-                if (row.hasOwnProperty(k) && k) {
-                    clean[k.trim().toLowerCase()] = row[k] ? row[k].trim() : '';
-                }
-            }
-            return {
-                awb: clean['awb'] || clean['awb_no'] || '',
-                staging: clean['destination_staging'] || clean['staging'] || '',
-                produk: clean['service_code'] || clean['produk'] || clean['service'] || '',
-                uz: clean['destination_hub'] || clean['destination_uz'] || clean['hub'] || '',
-                edd: clean['expect_delivery_tm'] || clean['edd'] || '',
-                fop: clean['latest_op_code'] || clean['fop_code_internal'] || clean['fop'] || 'KOSONG'
-            };
-        }
-
-        function normalizeContainerRow(row) {
-            const clean = {};
-            for (let k in row) {
-                if (row.hasOwnProperty(k) && k) {
-                    clean[k.trim().toLowerCase()] = row[k] ? row[k].trim() : '';
-                }
-            }
-            return {
-                containerNo: clean['container_no'] || clean['container'] || '',
-                awb: clean['awb'] || clean['awb_no'] || '',
-                zoneCode: clean['zone_code'] || clean['zone'] || '-'
-            };
-        }
-
-        document.getElementById('processBtn').addEventListener('click', () => {
-            const slaInput = document.getElementById('csvFileInput');
-            const containerInput = document.getElementById('csvContainerInput');
-            
-            if (!slaInput.files.length) {
-                alert('Silakan pilih file CSV SLA terlebih dahulu.');
-                return;
-            }
-            
-            const today = new Date();
-            globalRefDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-            globalRefDate.setHours(0, 0, 0, 0);
-
-            document.getElementById('loadingIndicator').classList.remove('hidden');
-            document.getElementById('loadingIndicator').classList.add('flex');
-            document.getElementById('dashboardContent').classList.add('hidden');
-            document.getElementById('screenshotBtn').classList.add('hidden');
-
-            const slaPromises = Array.from(slaInput.files).map(file => parseCSV(file));
-            const containerPromises = Array.from(containerInput.files).map(file => parseCSV(file));
-
-            Promise.all([
-                Promise.all(slaPromises),
-                Promise.all(containerPromises)
-            ]).then(([slaResultsArray, containerResultsArray]) => {
-                globalSlaData = slaResultsArray.flat();
-                globalContainerData = containerResultsArray.flat();
-                
-                const fopContainer = document.getElementById('fopFilterContainer');
-                const fopList = globalSlaData.map(item => normalizeSlaRow(item).fop);
-                const uniqueFops = [...new Set(fopList)].filter(val => val !== '').sort();
-                
-                if (uniqueFops.length > 0) {
-                    fopContainer.innerHTML = '';
-                    uniqueFops.forEach(fop => {
-                        const lbl = document.createElement('label');
-                        lbl.className = "cursor-pointer group";
-                        lbl.innerHTML = `
-                            <input type="checkbox" value="${fop}" class="peer hidden fop-filter" checked>
-                            <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-indigo-600 peer-checked:text-white peer-checked:border-indigo-600 hover:border-slate-300">${fop}</div>
-                        `;
-                        fopContainer.appendChild(lbl);
-                    });
-                }
-
-                const stagingContainer = document.getElementById('stagingFilterContainer');
-                const stagingList = globalSlaData.map(item => normalizeSlaRow(item).staging || 'TANPA STAGING');
-                const uniqueStagings = [...new Set(stagingList)].sort();
-                
-                if (uniqueStagings.length > 0) {
-                    stagingContainer.innerHTML = '';
-                    uniqueStagings.forEach(staging => {
-                        const lbl = document.createElement('label');
-                        lbl.className = "cursor-pointer group";
-                        lbl.innerHTML = `
-                            <input type="checkbox" value="${staging}" class="peer hidden staging-filter" checked>
-                            <div class="px-3 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-teal-600 peer-checked:text-white peer-checked:border-teal-600 hover:border-slate-300">${staging}</div>
-                        `;
-                        stagingContainer.appendChild(lbl);
-                    });
-                }
-
-                const produkContainer = document.getElementById('produkFilterContainer');
-                const produkList = globalSlaData.map(item => normalizeSlaRow(item).produk || 'TANPA PRODUK');
-                const uniqueProduks = [...new Set(produkList)].sort();
-                
-                if (uniqueProduks.length > 0) {
-                    produkContainer.innerHTML = '';
-                    uniqueProduks.forEach(produk => {
-                        const lbl = document.createElement('label');
-                        lbl.className = "cursor-pointer group";
-                        lbl.innerHTML = `
-                            <input type="checkbox" value="${produk}" class="peer hidden produk-filter" checked>
-                            <div class="px-3 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-cyan-600 peer-checked:text-white peer-checked:border-cyan-600 hover:border-slate-300">${produk}</div>
-                        `;
-                        produkContainer.appendChild(lbl);
-                    });
-                }
-
-                setupFilterListeners();
-
-                applyFiltersAndRender();
-            });
-        });
-
-        function applyFiltersAndRender() {
-            document.getElementById('loadingIndicator').classList.remove('hidden');
-            document.getElementById('loadingIndicator').classList.add('flex');
-            document.getElementById('dashboardContent').classList.add('hidden');
-            
-            setTimeout(() => {
-                processData(globalSlaData, globalContainerData, globalRefDate);
-            }, 50);
-        }
-
-        function getHubGroup(prefix) {
-            const p = prefix ? prefix.toUpperCase() : "";
-            if (p === "MKS") return "MKS";
-            if (p === "BPP") return "BPP";
-            if (p === "BJM") return "BJM";
-            if (p === "PLK") return "PLK";
-            if (p === "MND") return "MND";
-            if (p === "PAL") return "PAL";
-            if (p === "KDI") return "KDI";
-            return "Gateway";
-        }
-
-        function processData(slaData, containerData, refDate) {
-            const selectedHubs = Array.from(document.querySelectorAll('.hub-filter:checked')).map(cb => cb.value);
-            const selectedEdds = Array.from(document.querySelectorAll('.edd-filter:checked')).map(cb => cb.value);
-            const selectedFops = Array.from(document.querySelectorAll('.fop-filter:checked')).map(cb => cb.value);
-            const selectedStagings = Array.from(document.querySelectorAll('.staging-filter:checked')).map(cb => cb.value);
-            const selectedProduks = Array.from(document.querySelectorAll('.produk-filter:checked')).map(cb => cb.value);
-
-            window.tableAwbs = {};
-            const stagingData = {};
-            const produkData = {};
-            const fopMatrixData = {};
-            const awbTargetMap = new Map();
-
-            slaData.forEach(rawRow => {
-                const row = normalizeSlaRow(rawRow);
-                const awb = row.awb;
-                const staging = row.staging;
-                const produk = row.produk;
-                const uz = row.uz;
-                const eddRaw = row.edd;
-                const fopRaw = row.fop || 'KOSONG';
-                const stagingFilterVal = staging || 'TANPA STAGING';
-                const produkFilterVal = produk || 'TANPA PRODUK';
-
-                if (!awb || !eddRaw) return;
-                if (awb.startsWith('5100')) return;
-                if (selectedFops.length > 0 && !selectedFops.includes(fopRaw)) return;
-                if (selectedStagings.length > 0 && !selectedStagings.includes(stagingFilterVal)) return;
-                if (selectedProduks.length > 0 && !selectedProduks.includes(produkFilterVal)) return;
-
-                const eddParts = eddRaw.split(' ')[0];
-                const edd = new Date(eddParts);
-                edd.setHours(0, 0, 0, 0);
-
-                if (isNaN(edd)) return;
-
-                const diffTime = edd - refDate;
-                const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-
-                let category = diffDays < 0 ? "After EDD" : diffDays === 0 ? "Last Day" : (diffDays > 0 && diffDays <= 2) ? "Sameday" : ">2 Hari";
-                let eddCategory = diffDays < 0 ? "<0" : diffDays <= 4 ? diffDays.toString() : ">4";
-
-                const uzPrefix = uz ? uz.substring(0, 3) : "";
-                const destHub = getHubGroup(uzPrefix);
-
-                if (selectedHubs.includes(destHub)) {
-                    awbTargetMap.set(awb, eddCategory);
-                    if (selectedEdds.includes(eddCategory)) {
-                        let stagingKey = destHub === "Gateway" ? "Gateway" : (staging || `${destHub} (Tanpa Staging)`);
-                        const compKey = `${destHub}::${stagingKey}`;
-                        
-                        if (!stagingData[compKey]) stagingData[compKey] = {};
-                        if (!stagingData[compKey][category]) stagingData[compKey][category] = [];
-                        stagingData[compKey][category].push(awb);
-
-                        if (produk) {
-                            if (!produkData[produk]) produkData[produk] = {};
-                            if (!produkData[produk][category]) produkData[produk][category] = [];
-                            produkData[produk][category].push(awb);
-                        }
-
-                        if (!fopMatrixData[destHub]) fopMatrixData[destHub] = {};
-                        if (!fopMatrixData[destHub][fopRaw]) fopMatrixData[destHub][fopRaw] = [];
-                        fopMatrixData[destHub][fopRaw].push(awb);
-                    }
-                }
-            });
-
-            const containerAbsoluteTotalMap = {};
-            containerData.forEach(rawRow => {
-                const row = normalizeContainerRow(rawRow);
-                const containerNo = row.containerNo;
-                const awb = row.awb;
-                if (containerNo && awb) containerAbsoluteTotalMap[containerNo] = (containerAbsoluteTotalMap[containerNo] || 0) + 1;
-            });
-
-            const containerTargetMap = {};
-            containerData.forEach(rawRow => {
-                const row = normalizeContainerRow(rawRow);
-                const awb = row.awb;
-                const containerNo = row.containerNo;
-                const zoneCode = row.zoneCode;
-
-                if (awb && containerNo && awbTargetMap.has(awb)) {
-                    const eddCategory = awbTargetMap.get(awb);
-                    if (selectedEdds.includes(eddCategory)) {
-                        if (!containerTargetMap[containerNo]) {
-                            containerTargetMap[containerNo] = { count: 0, zone: zoneCode || '-', breakdown: {}, totalAwbInContainer: containerAbsoluteTotalMap[containerNo] || 0 };
-                        }
-                        containerTargetMap[containerNo].count += 1;
-                        if (!containerTargetMap[containerNo].breakdown[eddCategory]) containerTargetMap[containerNo].breakdown[eddCategory] = [];
-                        containerTargetMap[containerNo].breakdown[eddCategory].push(awb);
-                    }
-                }
-            });
-
-            const dateStr = refDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-
-            renderTable('tableStagingContainer', stagingData, 'Estimasi Inbound Tgl ' + dateStr, 'Tujuan,Staging Destinasi');
-            renderTable('tableProdukContainer', produkData, 'Service', 'Produk');
-            renderContainerTable('tableContainerSameday', containerTargetMap, 'Data Container Berdasarkan Filter');
-            renderFopMatrixTable('tableFopContainer', fopMatrixData, 'Sebaran FOP Berdasarkan Tujuan', selectedFops);
-
-            document.getElementById('loadingIndicator').classList.add('hidden');
-            document.getElementById('loadingIndicator').classList.remove('flex');
-            document.getElementById('dashboardContent').classList.remove('hidden');
-            document.getElementById('screenshotBtn').classList.remove('hidden');
-        }
-
-        const btnCopyTpl = (contId, key) => `<button onclick="copyAwbs('${contId}', '${key}', this)" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 bg-slate-800 text-white border border-slate-700 px-3 py-1.5 rounded shadow-xl z-10 font-semibold text-[10px] uppercase tracking-wide flex items-center transition-all transform scale-90 group-hover:scale-100">📋 Salin</button>`;
-
-        function renderTable(containerId, dataObj, title, rowLabel) {
-            const container = document.getElementById(containerId);
-            const isMultiCol = rowLabel.includes(',');
-            const labels = isMultiCol ? rowLabel.split(',') : [rowLabel];
-            window.tableAwbs[containerId] = {};
-
-            let thLabels = labels.map(lbl => `<th class="py-3 px-4 font-bold tracking-wider">${lbl}</th>`).join('');
-            
-            let html = `
-                <div class="p-5 border-b border-slate-200 bg-white flex items-center justify-between">
-                    <h2 class="text-base font-bold text-slate-800">${title}</h2>
-                </div>
-                <div class="overflow-x-auto custom-scrollbar">
-                    <table class="w-full text-left text-xs text-slate-600">
-                        <thead class="bg-slate-50/80 text-slate-500 uppercase border-b border-slate-200">
-                            <tr>
-                                ${thLabels}
-                                <th class="py-3 px-3 text-center font-bold tracking-wider text-red-500">After EDD</th>
-                                <th class="py-3 px-3 text-center font-bold tracking-wider text-orange-500">Last Day</th>
-                                <th class="py-3 px-3 text-center font-bold tracking-wider text-amber-500">Sameday</th>
-                                <th class="py-3 px-3 text-center font-bold tracking-wider text-emerald-500">>2 Hari</th>
-                                <th class="py-3 px-3 text-center font-bold tracking-wider text-slate-700">Total</th>
-                                <th class="py-3 px-4 text-center font-bold tracking-wider text-purple-600">SLA MAX</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-            `;
-
-            let grandTotals = { "After EDD": 0, "Last Day": 0, "Sameday": 0, ">2 Hari": 0, "Total": 0 };
-            let grandTotalAwbs = { "After EDD": [], "Last Day": [], "Sameday": [], ">2 Hari": [], "Total": [] };
-            
-            let rowData = Object.keys(dataObj).map(key => {
-                const row = dataObj[key];
-                const afterArr = row['After EDD'] || [];
-                const lastArr = row['Last Day'] || [];
-                const sameArr = row['Sameday'] || [];
-                const moreArr = row['>2 Hari'] || [];
-                const totalArr = afterArr.concat(lastArr, sameArr, moreArr);
-                const parts = isMultiCol ? key.split('::') : [key];
-                return { key, part0: parts[0], part1: parts[1] || '', after: afterArr.length, last: lastArr.length, same: sameArr.length, more: moreArr.length, total: totalArr.length, afterArr, lastArr, sameArr, moreArr, totalArr };
-            });
-
-            rowData.sort((a, b) => {
-                if (isMultiCol) {
-                    const r = n => ({'MKS':1,'BPP':2,'BJM':3,'PLK':4,'MND':5,'PAL':6,'KDI':7,'Gateway':8}[n] || 99);
-                    if (r(a.part0) !== r(b.part0)) return r(a.part0) - r(b.part0);
-                }
-                return b.total - a.total;
-            });
-
-            let rowSpans = {};
-            if (isMultiCol) rowData.forEach(r => rowSpans[r.part0] = (rowSpans[r.part0] || 0) + 1);
-
-            const makeBodyCell = (key, count, colorTheme) => {
-                if (count === 0) return `<td class="py-2.5 px-3 text-center"><span class="text-slate-300 font-medium">-</span></td>`;
-                const themeClasses = {
-                    red: 'bg-red-50 text-red-600 group-hover:bg-red-100',
-                    orange: 'bg-orange-50 text-orange-600 group-hover:bg-orange-100',
-                    amber: 'bg-amber-50 text-amber-600 group-hover:bg-amber-100',
-                    emerald: 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100',
-                    slate: 'bg-slate-100 text-slate-700 group-hover:bg-slate-200'
-                }[colorTheme];
-
-                return `
-                    <td class="py-2.5 px-3 text-center relative group cursor-pointer" title="Klik untuk salin resi">
-                        <span class="group-hover:opacity-0 transition-opacity inline-flex items-center justify-center min-w-[2.5rem] px-2 py-1 rounded-md font-bold text-[11px] ${themeClasses}">${count.toLocaleString('id-ID')}</span>
-                        ${btnCopyTpl(containerId, key)}
-                    </td>
-                `;
-            };
-
-            if (rowData.length === 0) {
-                html += `<tr><td colspan="${isMultiCol ? 8 : 7}" class="py-8 text-center text-slate-400 italic">Tidak ada data sesuai filter.</td></tr>`;
-            } else {
-                let rIdx = 0, renderedPart0 = {};
-                for (const row of rowData) {
-                    grandTotalAwbs["After EDD"] = grandTotalAwbs["After EDD"].concat(row.afterArr);
-                    grandTotalAwbs["Last Day"] = grandTotalAwbs["Last Day"].concat(row.lastArr);
-                    grandTotalAwbs["Sameday"] = grandTotalAwbs["Sameday"].concat(row.sameArr);
-                    grandTotalAwbs[">2 Hari"] = grandTotalAwbs[">2 Hari"].concat(row.moreArr);
-                    grandTotalAwbs["Total"] = grandTotalAwbs["Total"].concat(row.totalArr);
-
-                    grandTotals["After EDD"] += row.after; grandTotals["Last Day"] += row.last; grandTotals["Sameday"] += row.same; grandTotals[">2 Hari"] += row.more; grandTotals["Total"] += row.total;
-
-                    window.tableAwbs[containerId][`r${rIdx}_after`] = row.afterArr;
-                    window.tableAwbs[containerId][`r${rIdx}_last`] = row.lastArr;
-                    window.tableAwbs[containerId][`r${rIdx}_same`] = row.sameArr;
-                    window.tableAwbs[containerId][`r${rIdx}_more`] = row.moreArr;
-                    window.tableAwbs[containerId][`r${rIdx}_total`] = row.totalArr;
-
-                    let tdLabels = '';
-                    if (isMultiCol) {
-                        if (!renderedPart0[row.part0]) {
-                            tdLabels += `<td class="py-2.5 px-4 font-semibold text-slate-900 whitespace-nowrap align-middle border-r border-slate-100 bg-white" rowspan="${rowSpans[row.part0]}">${row.part0}</td>`;
-                            renderedPart0[row.part0] = true;
-                        }
-                        tdLabels += `<td class="py-2.5 px-4 font-medium text-slate-700 whitespace-nowrap">${row.part1}</td>`;
-                    } else {
-                        tdLabels = `<td class="py-2.5 px-4 font-semibold text-slate-900 whitespace-nowrap">${row.part0}</td>`;
-                    }
-
-                    html += `
-                        <tr class="hover:bg-slate-50/80 transition-colors border-b border-transparent hover:border-slate-100">
-                            ${tdLabels}
-                            ${makeBodyCell(`r${rIdx}_after`, row.after, 'red')}
-                            ${makeBodyCell(`r${rIdx}_last`, row.last, 'orange')}
-                            ${makeBodyCell(`r${rIdx}_same`, row.same, 'amber')}
-                            ${makeBodyCell(`r${rIdx}_more`, row.more, 'emerald')}
-                            ${makeBodyCell(`r${rIdx}_total`, row.total, 'slate')}
-                            <td class="py-2.5 px-4 text-center font-extrabold text-purple-600">${row.total > 0 ? (((row.same + row.more) / row.total) * 100).toFixed(1) + '%' : '-'}</td>
-                        </tr>
-                    `;
-                    rIdx++;
-                }
-            }
-
-            Object.assign(window.tableAwbs[containerId], grandTotalAwbs);
-
-            const makeTfootCell = (cat, colorTheme) => {
-                const count = grandTotals[cat];
-                if (count === 0) return `<td class="py-4 px-3 text-center text-slate-400">-</td>`;
-                const themeClasses = {
-                    red: 'text-red-600', orange: 'text-orange-600', amber: 'text-amber-600',
-                    emerald: 'text-emerald-600', slate: 'text-slate-800'
-                }[colorTheme];
-                return `
-                    <td class="py-4 px-3 text-center relative group cursor-pointer" title="Salin total ${cat}">
-                        <span class="group-hover:opacity-0 transition-opacity block font-extrabold text-sm ${themeClasses}">${count.toLocaleString('id-ID')}</span>
-                        ${btnCopyTpl(containerId, cat)}
-                    </td>
-                `;
-            };
-
-            html += `
-                        </tbody>
-                        <tfoot class="bg-slate-50 border-t-2 border-slate-200 shadow-inner">
-                            <tr>
-                                <td class="py-4 px-4 font-bold text-slate-700 uppercase tracking-wider text-[11px]" colspan="${isMultiCol ? 2 : 1}">Total Keseluruhan</td>
-                                ${makeTfootCell("After EDD", "red")}
-                                ${makeTfootCell("Last Day", "orange")}
-                                ${makeTfootCell("Sameday", "amber")}
-                                ${makeTfootCell(">2 Hari", "emerald")}
-                                ${makeTfootCell("Total", "slate")}
-                                <td class="py-4 px-4 text-center font-extrabold text-purple-700 text-sm">${grandTotals["Total"] > 0 ? (((grandTotals["Sameday"] + grandTotals[">2 Hari"]) / grandTotals["Total"]) * 100).toFixed(1) + '%' : '-'}</td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
-            `;
-            container.innerHTML = html;
-        }
-
-        function renderContainerTable(containerId, dataObj, title) {
-            const container = document.getElementById(containerId);
-            window.tableAwbs[containerId] = {};
-            const sortedData = Object.entries(dataObj).sort((a, b) => b[1].count - a[1].count);
-            const allContainersText = sortedData.map(item => item[0]).join('\n');
-            
-            let html = `
-                <div class="p-5 border-b border-slate-200 bg-white flex justify-between items-center">
-                    <h2 class="text-base font-bold text-slate-800">${title}</h2>
-                    <div class="flex gap-3 items-center">
-                        ${sortedData.length > 0 ? `
-                        <button onclick="copyToClipboard('${allContainersText.replace(/\n/g, '\\n')}', this)" class="text-xs bg-white hover:bg-slate-50 text-slate-600 font-semibold px-3 py-1.5 rounded-lg border border-slate-300 shadow-sm transition-all flex items-center gap-1.5">
-                            <span>📋</span> Salin Semua Container
-                        </button>` : ''}
-                    </div>
-                </div>
-                <div class="max-h-[500px] overflow-y-auto custom-scrollbar relative">
-                    <table class="w-full text-left text-xs text-slate-600">
-                        <thead class="bg-slate-50/95 backdrop-blur-sm text-slate-500 uppercase border-b border-slate-200 sticky top-0 z-20">
-                            <tr>
-                                <th class="py-3 px-4 font-bold tracking-wider whitespace-nowrap">No. Container</th>
-                                <th class="py-3 px-2 text-center font-bold tracking-wider text-slate-700" title="Kapasitas total">Isi</th>
-                                <th class="py-3 px-2 text-center font-bold tracking-wider text-red-500">&lt;0</th>
-                                <th class="py-3 px-2 text-center font-bold tracking-wider text-brand-500">H+0</th>
-                                <th class="py-3 px-2 text-center font-bold tracking-wider text-brand-500">H+1</th>
-                                <th class="py-3 px-2 text-center font-bold tracking-wider text-brand-500">H+2</th>
-                                <th class="py-3 px-2 text-center font-bold tracking-wider text-brand-500">H+3</th>
-                                <th class="py-3 px-2 text-center font-bold tracking-wider text-brand-500">H+4</th>
-                                <th class="py-3 px-2 text-center font-bold tracking-wider text-brand-500">&gt;4</th>
-                                <th class="py-3 px-3 text-center font-bold tracking-wider text-slate-700">Filter</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-            `;
-
-            let ctTot = { '<0': 0, '0': 0, '1': 0, '2': 0, '3': 0, '4': 0, '>4': 0, 'Total': 0, 'TotalIsi': 0 };
-            let ctAwb = { '<0': [], '0': [], '1': [], '2': [], '3': [], '4': [], '>4': [], 'Total': [] };
-
-            const makeContBodyCell = (key, count, isRed, isTotal) => {
-                if (count === 0) return `<td class="py-2.5 px-2 text-center"><span class="text-slate-300">-</span></td>`;
-                const bg = isTotal ? 'bg-slate-100 text-slate-800' : (isRed ? 'bg-red-50 text-red-600' : 'bg-brand-50 text-brand-700');
-                return `
-                    <td class="py-2.5 px-2 text-center relative group cursor-pointer" title="Salin resi">
-                        <span class="group-hover:opacity-0 transition-opacity inline-flex items-center justify-center min-w-[2rem] px-1.5 py-1 rounded font-bold text-[11px] ${bg}">${count.toLocaleString('id-ID')}</span>
-                        ${btnCopyTpl(containerId, key)}
-                    </td>
-                `;
-            };
-
-            if (sortedData.length === 0) {
-                html += `<tr><td colspan="10" class="py-8 text-center text-slate-400 italic">Tidak ada Container dengan resi target.</td></tr>`;
-            } else {
-                let rIdx = 0;
-                for (const [containerNo, info] of sortedData) {
-                    const b = info.breakdown;
-                    const aL=b['<0']||[], a0=b['0']||[], a1=b['1']||[], a2=b['2']||[], a3=b['3']||[], a4=b['4']||[], aM=b['>4']||[];
-                    const totArr = aL.concat(a0,a1,a2,a3,a4,aM);
-
-                    ctAwb['<0'].push(...aL); ctAwb['0'].push(...a0); ctAwb['1'].push(...a1); ctAwb['2'].push(...a2); ctAwb['3'].push(...a3); ctAwb['4'].push(...a4); ctAwb['>4'].push(...aM); ctAwb['Total'].push(...totArr);
-                    ctTot['<0']+=aL.length; ctTot['0']+=a0.length; ctTot['1']+=a1.length; ctTot['2']+=a2.length; ctTot['3']+=a3.length; ctTot['4']+=a4.length; ctTot['>4']+=aM.length; ctTot['Total']+=totArr.length; ctTot['TotalIsi']+=info.totalAwbInContainer;
-
-                    window.tableAwbs[containerId][`r${rIdx}_<0`] = aL; window.tableAwbs[containerId][`r${rIdx}_0`] = a0; window.tableAwbs[containerId][`r${rIdx}_1`] = a1; window.tableAwbs[containerId][`r${rIdx}_2`] = a2; window.tableAwbs[containerId][`r${rIdx}_3`] = a3; window.tableAwbs[containerId][`r${rIdx}_4`] = a4; window.tableAwbs[containerId][`r${rIdx}_>4`] = aM; window.tableAwbs[containerId][`r${rIdx}_Total`] = totArr;
-
-                    html += `
-                        <tr class="hover:bg-slate-50 transition-colors">
-                            <td class="py-2.5 px-4 font-semibold text-slate-800 flex items-center justify-between group/row">
-                                <span class="font-mono">${containerNo}</span>
-                                <button onclick="copyToClipboard('${containerNo}', this)" class="text-slate-300 hover:text-brand-600 opacity-0 group-hover/row:opacity-100 transition-opacity" title="Salin nomor container">
-                                    📋
-                                </button>
-                            </td>
-                            <td class="py-2.5 px-2 text-center text-slate-500 font-semibold bg-slate-50/50">${info.totalAwbInContainer.toLocaleString('id-ID')}</td>
-                            ${makeContBodyCell(`r${rIdx}_<0`, aL.length, true, false)}
-                            ${makeContBodyCell(`r${rIdx}_0`, a0.length, false, false)}
-                            ${makeContBodyCell(`r${rIdx}_1`, a1.length, false, false)}
-                            ${makeContBodyCell(`r${rIdx}_2`, a2.length, false, false)}
-                            ${makeContBodyCell(`r${rIdx}_3`, a3.length, false, false)}
-                            ${makeContBodyCell(`r${rIdx}_4`, a4.length, false, false)}
-                            ${makeContBodyCell(`r${rIdx}_>4`, aM.length, false, false)}
-                            ${makeContBodyCell(`r${rIdx}_Total`, totArr.length, false, true)}
-                        </tr>
-                    `;
-                    rIdx++;
-                }
-            }
-
-            Object.assign(window.tableAwbs[containerId], ctAwb);
-
-            const makeContTfootCell = (cat, isRed, isTotal) => {
-                const count = ctTot[cat];
-                if (count === 0) return `<td class="py-4 px-2 text-center text-slate-400">-</td>`;
-                const tc = isTotal ? 'text-slate-800' : (isRed ? 'text-red-600' : 'text-brand-600');
-                return `
-                    <td class="py-4 px-2 text-center relative group cursor-pointer" title="Salin total filter">
-                        <span class="group-hover:opacity-0 transition-opacity block font-extrabold text-sm ${tc}">${count.toLocaleString('id-ID')}</span>
-                        ${btnCopyTpl(containerId, cat)}
-                    </td>
-                `;
-            };
-
-            html += `
-                        </tbody>
-                        <tfoot class="bg-slate-50 border-t-2 border-slate-200 shadow-inner sticky bottom-0 z-20">
-                            <tr>
-                                <td class="py-4 px-4 font-bold text-slate-700 uppercase tracking-wider text-[11px]">Total Filter</td>
-                                <td class="py-4 px-2 text-center font-bold text-slate-500 bg-slate-100/50">${ctTot['TotalIsi'].toLocaleString('id-ID')}</td>
-                                ${makeContTfootCell('<0', true, false)}
-                                ${makeContTfootCell('0', false, false)}
-                                ${makeContTfootCell('1', false, false)}
-                                ${makeContTfootCell('2', false, false)}
-                                ${makeContTfootCell('3', false, false)}
-                                ${makeContTfootCell('4', false, false)}
-                                ${makeContTfootCell('>4', false, false)}
-                                ${makeContTfootCell('Total', false, true)}
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
-            `;
-            container.innerHTML = html;
-        }
-
-        function renderFopMatrixTable(containerId, dataObj, title, fopColumns) {
-            const container = document.getElementById(containerId);
-            window.tableAwbs[containerId] = {};
-            const sortedCols = [...fopColumns].sort();
-
-            let thCols = sortedCols.map(col => `<th class="py-3 px-3 text-center font-bold tracking-wider text-brand-600">${col}</th>`).join('');
-
-            let html = `
-                <div class="p-5 border-b border-slate-200 bg-white flex justify-between items-center">
-                    <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
-                        <span class="text-brand-500">📈</span>
-                        ${title}
-                    </h2>
-                </div>
-                <div class="overflow-x-auto max-h-96 custom-scrollbar">
-                    <table class="w-full text-left text-xs text-slate-600 relative">
-                        <thead class="bg-slate-50/90 backdrop-blur-sm text-slate-500 uppercase border-b border-slate-200 sticky top-0 z-10">
-                            <tr>
-                                <th class="py-3 px-4 font-bold tracking-wider border-r border-slate-200">Tujuan</th>
-                                ${thCols}
-                                <th class="py-3 px-4 text-center font-bold tracking-wider text-slate-700 bg-slate-100/50">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-            `;
-
-            let grandTotals = { Total: 0 };
-            let grandTotalAwbs = { Total: [] };
-            sortedCols.forEach(col => { grandTotals[col] = 0; grandTotalAwbs[col] = []; });
-
-            let rowData = Object.keys(dataObj).map(hub => {
-                const row = dataObj[hub];
-                let rowTotalArr = [], rowCols = {};
-                sortedCols.forEach(col => {
-                    const arr = row[col] || [];
-                    rowCols[col] = { count: arr.length, awbs: arr };
-                    rowTotalArr = rowTotalArr.concat(arr);
-                });
-                return { hub, rowCols, total: rowTotalArr.length, totalArr: rowTotalArr };
-            });
-
-            rowData.sort((a, b) => {
-                const r = n => ({'MKS':1,'BPP':2,'BJM':3,'PLK':4,'MND':5,'PAL':6,'KDI':7,'Gateway':8}[n] || 99);
-                return r(a.hub) - r(b.hub);
-            });
-
-            if (rowData.length === 0) {
-                html += `<tr><td colspan="${sortedCols.length + 2}" class="py-8 text-center text-slate-400 italic">Tidak ada data.</td></tr>`;
-            } else {
-                let rIdx = 0;
-                for (const row of rowData) {
-                    html += `<tr class="hover:bg-slate-50 transition-colors">
-                                <td class="py-2.5 px-4 font-semibold text-slate-900 whitespace-nowrap border-r border-slate-100">${row.hub}</td>`;
-
-                    sortedCols.forEach(col => {
-                        const cell = row.rowCols[col];
-                        grandTotals[col] += cell.count;
-                        grandTotalAwbs[col] = grandTotalAwbs[col].concat(cell.awbs);
-                        window.tableAwbs[containerId][`r${rIdx}_${col}`] = cell.awbs;
-                        
-                        if (cell.count === 0) {
-                            html += `<td class="py-2.5 px-3 text-center text-slate-300">-</td>`;
-                        } else {
-                            html += `
-                                <td class="py-2.5 px-3 text-center relative group cursor-pointer" title="Salin resi">
-                                    <span class="group-hover:opacity-0 transition-opacity inline-flex items-center justify-center min-w-[2.5rem] px-2 py-1 rounded-md font-bold text-[11px] bg-brand-50 text-brand-700">${cell.count.toLocaleString('id-ID')}</span>
-                                    ${btnCopyTpl(containerId, `r${rIdx}_${col}`)}
-                                </td>`;
-                        }
-                    });
-
-                    grandTotals.Total += row.total;
-                    grandTotalAwbs.Total = grandTotalAwbs.Total.concat(row.totalArr);
-                    window.tableAwbs[containerId][`r${rIdx}_Total`] = row.totalArr;
-
-                    if (row.total === 0) {
-                        html += `<td class="py-2.5 px-4 text-center font-medium text-slate-400 bg-slate-50/50">-</td></tr>`;
-                    } else {
-                        html += `
-                            <td class="py-2.5 px-4 text-center relative group cursor-pointer bg-slate-50/50" title="Salin resi">
-                                <span class="group-hover:opacity-0 transition-opacity inline-flex items-center justify-center min-w-[3rem] px-2 py-1 rounded-md font-extrabold text-[12px] bg-slate-200 text-slate-800">${row.total.toLocaleString('id-ID')}</span>
-                                ${btnCopyTpl(containerId, `r${rIdx}_Total`)}
-                            </td></tr>`;
-                    }
-                    rIdx++;
-                }
-            }
-
-            Object.assign(window.tableAwbs[containerId], grandTotalAwbs);
-
-            const makeTfootCell = (cat, isTotal) => {
-                const count = grandTotals[cat];
-                if (count === 0) return `<td class="py-4 px-3 text-center text-slate-400">-</td>`;
-                const tc = isTotal ? 'text-slate-800' : 'text-brand-600';
-                return `
-                    <td class="py-4 px-3 text-center relative group cursor-pointer" title="Salin semua resi untuk ${cat}">
-                        <span class="group-hover:opacity-0 transition-opacity block font-extrabold text-sm ${tc}">${count.toLocaleString('id-ID')}</span>
-                        ${btnCopyTpl(containerId, cat)}
-                    </td>
-                `;
-            };
-
-            html += `
-                        </tbody>
-                        <tfoot class="bg-slate-50 border-t-2 border-slate-200 shadow-inner">
-                            <tr>
-                                <td class="py-4 px-4 font-bold text-slate-700 uppercase tracking-wider text-[11px] border-r border-slate-200">Total Keseluruhan</td>
-                                ${sortedCols.map(col => makeTfootCell(col, false)).join('')}
-                                ${makeTfootCell('Total', true)}
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
-            `;
-            container.innerHTML = html;
-        }
-
-        document.getElementById('screenshotBtn').addEventListener('click', async () => {
-            const btn = document.getElementById('screenshotBtn');
-            const originalHTML = btn.innerHTML;
-            btn.innerHTML = 'Memproses...';
-            
-            const element = document.getElementById('dashboardContent');
-            try {
-                const canvas = await html2canvas(element, { scale: 2, backgroundColor: "#f8fafc" });
-                const link = document.createElement('a');
-                link.download = `SLA-Container-${new Date().toISOString().slice(0,10)}.png`;
-                link.href = canvas.toDataURL('image/png');
-                link.click();
-                
-                btn.innerHTML = '✓ Diunduh';
-                setTimeout(() => btn.innerHTML = originalHTML, 3000);
-            } catch (err) {
-                console.error(err);
-                alert('Gagal memproses gambar.');
-                btn.innerHTML = originalHTML;
-            }
-        });
-    </script>
-</body>
-</html>
+ <!-- Application Structure Plan: Interactive dashboard designed for tracking Hub SLA and Container distribution. Includes flexible CSV uploader supporting auto-detection of delimiters and mapping for both new (awb, service_code, destination_hub, latest_op_code) and old header formats. Structure features a Header control bar, Filter panel for Hubs, EDD, and FOPs, FOP Matrix Summary, Inbound Estimates, Service breakdown, and Container breakdown with instant copy-to-clipboard functionality. -->
+ <!-- Visualization & Content Choices: Uses dynamic HTML tables with Tailwind responsive layouts, visual color-coded badges for SLA windows, and status indicators. All SVG icons replaced with Unicode/HTML elements for zero-dependency lightness. NO SVG or Mermaid JS used. -->
+ <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+ <!DOCTYPE html>
+ <html lang="id">
+ <head>
+     <meta charset="UTF-8">
+     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+     <title>Dashboard SLA Staging & Produk</title>
+     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+     <script src="https://cdn.tailwindcss.com/"></script>
+     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+     <script>
+         tailwind.config = {
+             theme: {
+                 extend: {
+                     fontFamily: { sans: ['Inter', 'sans-serif'] },
+                     colors: {
+                         brand: { 50: '#eff6ff', 100: '#dbeafe', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8' }
+                     }
+                 }
+             }
+         }
+     </script>
+     <style>
+         .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
+         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+         .fade-in { animation: fadeIn 0.3s ease-in-out; }
+         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+     </style>
+ </head>
+ <body class="bg-slate-50 min-h-screen font-sans text-slate-800 pb-12">
+     <div class="max-w-[1600px] mx-auto px-4 sm:px-6 py-6">
+
+         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6 fade-in">
+             <div class="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+                 <div class="flex items-center gap-4">
+                     <div class="bg-gradient-to-br from-brand-500 to-indigo-600 p-3 rounded-xl shadow-md text-white text-xl font-extrabold flex items-center justify-center w-12 h-12">
+                         📊
+                     </div>
+                     <div>
+                         <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Dashboard Pantauan SLA & Container</h1>
+                         <p class="text-sm text-slate-500 font-medium mt-1">Sistem Pemantauan Performa Hub & Rincian Pengiriman</p>
+                     </div>
+                 </div>
+                 <div class="flex gap-3 w-full md:w-auto">
+                     <button id="processBtn" class="flex-1 md:flex-none bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 px-6 rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2">
+                         <span>▶</span> Proses Data
+                     </button>
+                     <button id="screenshotBtn" class="hidden flex-1 md:flex-none bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-6 rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2">
+                         <span>📥</span> Unduh Gambar
+                     </button>
+                 </div>
+             </div>
+
+             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <div class="relative group">
+                     <input type="file" id="csvFileInput" accept=".csv" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+                     <div class="flex items-center justify-between px-4 py-3.5 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50/50 group-hover:border-brand-500 group-hover:bg-brand-50 transition-all">
+                         <div class="flex items-center gap-3.5">
+                             <div class="bg-white p-2.5 rounded-lg shadow-sm text-brand-600 border border-slate-200 group-hover:border-brand-200 text-lg">
+                                 📋
+                             </div>
+                             <div>
+                                 <p class="text-sm font-bold text-slate-700 group-hover:text-brand-700">1. Unggah Data SLA</p>
+                                 <p id="slaFileLabel" class="text-xs text-slate-500 font-medium mt-0.5">Mendukung format lama & format baru (awb, service_code, destination_hub, latest_op_code)</p>
+                             </div>
+                         </div>
+                         <span class="text-[11px] font-bold uppercase tracking-wider bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg group-hover:bg-brand-600 group-hover:text-white group-hover:border-brand-600 transition-colors">Pilih File</span>
+                     </div>
+                 </div>
+                 <div class="relative group">
+                     <input type="file" id="csvContainerInput" accept=".csv" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+                     <div class="flex items-center justify-between px-4 py-3.5 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50/50 group-hover:border-emerald-500 group-hover:bg-emerald-50 transition-all">
+                         <div class="flex items-center gap-3.5">
+                             <div class="bg-white p-2.5 rounded-lg shadow-sm text-emerald-600 border border-slate-200 group-hover:border-emerald-200 text-lg">
+                                 📦
+                             </div>
+                             <div>
+                                 <p class="text-sm font-bold text-slate-700 group-hover:text-emerald-700">2. Unggah Data Container</p>
+                                 <p id="containerFileLabel" class="text-xs text-slate-500 font-medium mt-0.5">Opsional (File CSV)</p>
+                             </div>
+                         </div>
+                         <span class="text-[11px] font-bold uppercase tracking-wider bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg group-hover:bg-emerald-600 group-hover:text-white group-hover:border-emerald-600 transition-colors">Pilih File</span>
+                     </div>
+                 </div>
+             </div>
+         </div>
+         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8 fade-in">
+             <h2 class="text-sm font-bold text-slate-900 mb-5 flex items-center gap-2">
+                 <span class="text-slate-400">⚙️</span> Panel Filter Data
+             </h2>
+
+             <div class="space-y-6">
+                 <div>
+                     <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Area Hub Tujuan</label>
+                     <div class="flex flex-wrap gap-2.5">
+                         <label class="cursor-pointer group">
+                             <input type="checkbox" value="MKS" class="peer hidden hub-filter" checked>
+                             <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-slate-800 peer-checked:text-white peer-checked:border-slate-800 hover:border-slate-300">MKS</div>
+                         </label>
+                         <label class="cursor-pointer group">
+                             <input type="checkbox" value="BPP" class="peer hidden hub-filter" checked>
+                             <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-slate-800 peer-checked:text-white peer-checked:border-slate-800 hover:border-slate-300">BPP</div>
+                         </label>
+                         <label class="cursor-pointer group">
+                             <input type="checkbox" value="BJM" class="peer hidden hub-filter" checked>
+                             <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-slate-800 peer-checked:text-white peer-checked:border-slate-800 hover:border-slate-300">BJM</div>
+                         </label>
+                         <label class="cursor-pointer group">
+                             <input type="checkbox" value="PLK" class="peer hidden hub-filter" checked>
+                             <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-slate-800 peer-checked:text-white peer-checked:border-slate-800 hover:border-slate-300">PLK</div>
+                         </label>
+                         <label class="cursor-pointer group">
+                             <input type="checkbox" value="MND" class="peer hidden hub-filter" checked>
+                             <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-slate-800 peer-checked:text-white peer-checked:border-slate-800 hover:border-slate-300">MND</div>
+                         </label>
+                         <label class="cursor-pointer group">
+                             <input type="checkbox" value="PAL" class="peer hidden hub-filter" checked>
+                             <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-slate-800 peer-checked:text-white peer-checked:border-slate-800 hover:border-slate-300">PAL</div>
+                         </label>
+                         <label class="cursor-pointer group">
+                             <input type="checkbox" value="KDI" class="peer hidden hub-filter" checked>
+                             <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-slate-800 peer-checked:text-white peer-checked:border-slate-800 hover:border-slate-300">KDI</div>
+                         </label>
+                         <label class="cursor-pointer group">
+                             <input type="checkbox" value="TAR" class="peer hidden hub-filter" checked>
+                             <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-slate-800 peer-checked:text-white peer-checked:border-slate-800 hover:border-slate-300">TAR</div>
+                         </label>
+                         <label class="cursor-pointer group">
+                             <input type="checkbox" value="Gateway" class="peer hidden hub-filter" checked>
+                             <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-slate-800 peer-checked:text-white peer-checked:border-slate-800 hover:border-slate-300">Gateway</div>
+                         </label>
+                     </div>
+                 </div>
+                 <div>
+                     <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Batas Waktu Pengiriman (EDD)</label>
+                     <div class="flex flex-wrap gap-2.5">
+                         <label class="cursor-pointer group">
+                             <input type="checkbox" value="<0" class="peer hidden edd-filter" checked>
+                             <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-red-600 peer-checked:text-white peer-checked:border-red-600 hover:border-slate-300">Lewat SLA</div>
+                         </label>
+                         <label class="cursor-pointer group">
+                             <input type="checkbox" value="0" class="peer hidden edd-filter" checked>
+                             <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600 hover:border-slate-300">H+0</div>
+                         </label>
+                         <label class="cursor-pointer group">
+                             <input type="checkbox" value="1" class="peer hidden edd-filter" checked>
+                             <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600 hover:border-slate-300">H+1</div>
+                         </label>
+                         <label class="cursor-pointer group">
+                             <input type="checkbox" value="2" class="peer hidden edd-filter" checked>
+                             <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600 hover:border-slate-300">H+2</div>
+                         </label>
+                         <label class="cursor-pointer group">
+                             <input type="checkbox" value="3" class="peer hidden edd-filter" checked>
+                             <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600 hover:border-slate-300">H+3</div>
+                         </label>
+                         <label class="cursor-pointer group">
+                             <input type="checkbox" value="4" class="peer hidden edd-filter" checked>
+                             <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600 hover:border-slate-300">H+4</div>
+                         </label>
+                         <label class="cursor-pointer group">
+                             <input type="checkbox" value=">4" class="peer hidden edd-filter" checked>
+                             <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600 hover:border-slate-300">&gt;H+4</div>
+                         </label>
+                     </div>
+                 </div>
+                 <div>
+                     <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">FOP (Fop Code / Latest Op Code)</label>
+                     <div id="fopFilterContainer" class="flex flex-wrap gap-2.5">
+                         <div class="px-4 py-1.5 rounded-full border border-dashed border-slate-300 bg-slate-50 text-slate-400 font-medium text-xs">
+                             Pilih file SLA untuk memunculkan filter otomatis...
+                         </div>
+                     </div>
+                 </div>
+                 <div>
+                     <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Staging Destinasi</label>
+                     <div id="stagingFilterContainer" class="flex flex-wrap gap-2.5 max-h-40 overflow-y-auto custom-scrollbar p-1">
+                         <div class="px-4 py-1.5 rounded-full border border-dashed border-slate-300 bg-slate-50 text-slate-400 font-medium text-xs">
+                             Pilih file SLA untuk memunculkan filter otomatis...
+                         </div>
+                     </div>
+                 </div>
+                 <div>
+                     <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Service / Produk</label>
+                     <div id="produkFilterContainer" class="flex flex-wrap gap-2.5 max-h-40 overflow-y-auto custom-scrollbar p-1">
+                         <div class="px-4 py-1.5 rounded-full border border-dashed border-slate-300 bg-slate-50 text-slate-400 font-medium text-xs">
+                             Pilih file SLA untuk memunculkan filter otomatis...
+                         </div>
+                     </div>
+                 </div>
+             </div>
+         </div>
+         <div id="loadingIndicator" class="hidden flex-col items-center justify-center py-16">
+             <div class="animate-spin rounded-full h-10 w-10 border-4 border-brand-500 border-t-transparent mb-4"></div>
+             <p class="text-slate-600 font-bold text-lg">Memproses Data...</p>
+             <p class="text-slate-400 text-sm mt-1">Mengalkulasi matrik dan menyusun tabel</p>
+         </div>
+         <div id="dashboardContent" class="hidden fade-in space-y-8">
+
+             <div id="tableFopContainer" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"></div>
+             <div class="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
+                 <div class="space-y-6">
+                     <div id="tableStagingContainer" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"></div>
+
+                     <div class="bg-indigo-50/50 rounded-2xl border border-indigo-100 p-5">
+                         <h3 class="font-bold text-indigo-900 mb-3 text-sm flex items-center gap-2">
+                             <span>ℹ️</span> Panduan Membaca Tabel
+                         </h3>
+                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-4 text-xs">
+                             <div class="flex items-start gap-2"><div class="w-2.5 h-2.5 rounded-full bg-slate-400 mt-0.5 shrink-0"></div><span class="text-slate-700"><b>Estimasi:</b> Paket yang diproses di Tgl tersebut</span></div>
+                             <div class="flex items-start gap-2"><div class="w-2.5 h-2.5 rounded-full bg-red-600 mt-0.5 shrink-0"></div><span class="text-slate-700"><b>After EDD:</b> Melewati batas waktu pengiriman</span></div>
+                             <div class="flex items-start gap-2"><div class="w-2.5 h-2.5 rounded-full bg-orange-500 mt-0.5 shrink-0"></div><span class="text-slate-700"><b>Last Day:</b> Batas maksimal hari ini</span></div>
+                             <div class="flex items-start gap-2"><div class="w-2.5 h-2.5 rounded-full bg-amber-400 mt-0.5 shrink-0"></div><span class="text-slate-700"><b>Sameday:</b> Sisa waktu 1 - 2 hari lagi</span></div>
+                             <div class="flex items-start gap-2"><div class="w-2.5 h-2.5 rounded-full bg-emerald-500 mt-0.5 shrink-0"></div><span class="text-slate-700"><b>>2 Hari:</b> Sisa waktu lebih dari 2 hari</span></div>
+                             <div class="flex items-start gap-2"><div class="w-2.5 h-2.5 rounded-full bg-purple-600 mt-0.5 shrink-0"></div><span class="text-slate-700"><b>SLA MAX:</b> Persentase paket berstatus aman</span></div>
+                         </div>
+                         <p class="text-[11px] text-indigo-500/80 font-medium mt-4 italic">*) Paket dengan resi Return (awb 5100xxx) dikecualikan dari tabel</p>
+                     </div>
+                 </div>
+
+                 <div class="space-y-8">
+                     <div id="tableProdukContainer" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"></div>
+                     <div id="tableContainerSameday" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"></div>
+                 </div>
+             </div>
+         </div>
+     </div>
+     <script>
+         let globalSlaData = [];
+         let globalContainerData = [];
+         let globalRefDate = new Date();
+         window.tableAwbs = {};
+         document.getElementById('csvFileInput').addEventListener('change', function(e) {
+             const count = e.target.files.length;
+             document.getElementById('slaFileLabel').innerText = count > 0 ? `${count} file CSV terpilih` : 'Mendukung format lama & format baru';
+             document.getElementById('slaFileLabel').classList.toggle('text-brand-600', count > 0);
+             document.getElementById('slaFileLabel').classList.toggle('font-bold', count > 0);
+         });
+         document.getElementById('csvContainerInput').addEventListener('change', function(e) {
+             const count = e.target.files.length;
+             document.getElementById('containerFileLabel').innerText = count > 0 ? `${count} file CSV terpilih` : 'Opsional (File CSV)';
+             document.getElementById('containerFileLabel').classList.toggle('text-emerald-600', count > 0);
+             document.getElementById('containerFileLabel').classList.toggle('font-bold', count > 0);
+         });
+         window.copyToClipboard = function(text, btnElement) {
+             const actualText = text.replace(/\\\n/g, '\n');
+             const textarea = document.createElement('textarea');
+             textarea.value = actualText;
+             document.body.appendChild(textarea);
+             textarea.select();
+             try {
+                 document.execCommand('copy');
+                 const originalHTML = btnElement.innerHTML;
+                 const isSalinSemua = originalHTML.includes('Salin Semua');
+
+                 if(isSalinSemua) {
+                     btnElement.innerHTML = '✓ Tersalin!';
+                     btnElement.classList.add('bg-emerald-600', 'text-white', 'border-emerald-600');
+                     btnElement.classList.remove('bg-white', 'text-slate-600');
+                 } else {
+                     btnElement.innerHTML = '✓ Tersalin';
+                     btnElement.classList.add('bg-emerald-500', 'text-white', 'border-emerald-500');
+                 }
+
+                 setTimeout(() => {
+                     btnElement.innerHTML = originalHTML;
+                     if(isSalinSemua) {
+                         btnElement.classList.remove('bg-emerald-600', 'text-white', 'border-emerald-600');
+                         btnElement.classList.add('bg-white', 'text-slate-600');
+                     } else {
+                         btnElement.classList.remove('bg-emerald-500', 'text-white', 'border-emerald-500');
+                     }
+                 }, 2000);
+             } catch (err) {
+                 console.error('Gagal menyalin', err);
+             }
+             document.body.removeChild(textarea);
+         };
+         window.copyAwbs = function(containerId, category, btnElement) {
+             const awbs = window.tableAwbs[containerId]?.[category] || [];
+             if (awbs.length === 0) return;
+             const text = awbs.join('\n');
+             window.copyToClipboard(text, btnElement);
+         };
+         const setupFilterListeners = () => {
+             document.querySelectorAll('.hub-filter, .edd-filter, .fop-filter, .staging-filter, .produk-filter').forEach(cb => {
+                 cb.addEventListener('change', () => {
+                     if (globalSlaData.length > 0) applyFiltersAndRender();
+                 });
+             });
+         };
+         setupFilterListeners();
+         function parseCSV(file) {
+             return new Promise((resolve) => {
+                 Papa.parse(file, {
+                     header: true,
+                     skipEmptyLines: true,
+                     dynamicTyping: false,
+                     complete: function(results) { resolve(results.data); },
+                     error: function(err) { console.error(err); resolve([]); }
+                 });
+             });
+         }
+         function normalizeSlaRow(row) {
+             const clean = {};
+             for (let k in row) {
+                 if (row.hasOwnProperty(k) && k) {
+                     clean[k.trim().toLowerCase()] = row[k] ? row[k].trim() : '';
+                 }
+             }
+             return {
+                 awb: clean['awb'] || clean['awb_no'] || '',
+                 staging: clean['destination_staging'] || clean['staging'] || '',
+                 produk: clean['service_code'] || clean['produk'] || clean['service'] || '',
+                 uz: clean['destination_hub'] || clean['destination_uz'] || clean['hub'] || '',
+                 edd: clean['expect_delivery_tm'] || clean['edd'] || '',
+                 fop: clean['latest_op_code'] || clean['fop_code_internal'] || clean['fop'] || 'KOSONG'
+             };
+         }
+         function normalizeContainerRow(row) {
+             const clean = {};
+             for (let k in row) {
+                 if (row.hasOwnProperty(k) && k) {
+                     clean[k.trim().toLowerCase()] = row[k] ? row[k].trim() : '';
+                 }
+             }
+             return {
+                 containerNo: clean['container_no'] || clean['container'] || '',
+                 awb: clean['awb'] || clean['awb_no'] || '',
+                 zoneCode: clean['zone_code'] || clean['zone'] || '-'
+             };
+         }
+         document.getElementById('processBtn').addEventListener('click', () => {
+             const slaInput = document.getElementById('csvFileInput');
+             const containerInput = document.getElementById('csvContainerInput');
+
+             if (!slaInput.files.length) {
+                 alert('Silakan pilih file CSV SLA terlebih dahulu.');
+                 return;
+             }
+
+             const today = new Date();
+             globalRefDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+             globalRefDate.setHours(0, 0, 0, 0);
+             document.getElementById('loadingIndicator').classList.remove('hidden');
+             document.getElementById('loadingIndicator').classList.add('flex');
+             document.getElementById('dashboardContent').classList.add('hidden');
+             document.getElementById('screenshotBtn').classList.add('hidden');
+             const slaPromises = Array.from(slaInput.files).map(file => parseCSV(file));
+             const containerPromises = Array.from(containerInput.files).map(file => parseCSV(file));
+             Promise.all([
+                 Promise.all(slaPromises),
+                 Promise.all(containerPromises)
+             ]).then(([slaResultsArray, containerResultsArray]) => {
+                 globalSlaData = slaResultsArray.flat();
+                 globalContainerData = containerResultsArray.flat();
+
+                 const fopContainer = document.getElementById('fopFilterContainer');
+                 const fopList = globalSlaData.map(item => normalizeSlaRow(item).fop);
+                 const uniqueFops = [...new Set(fopList)].filter(val => val !== '').sort();
+
+                 if (uniqueFops.length > 0) {
+                     fopContainer.innerHTML = '';
+                     uniqueFops.forEach(fop => {
+                         const lbl = document.createElement('label');
+                         lbl.className = "cursor-pointer group";
+                         lbl.innerHTML = `
+                             <input type="checkbox" value="${fop}" class="peer hidden fop-filter" checked>
+                             <div class="px-4 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-indigo-600 peer-checked:text-white peer-checked:border-indigo-600 hover:border-slate-300">${fop}</div>
+                         `;
+                         fopContainer.appendChild(lbl);
+                     });
+                 }
+                 const stagingContainer = document.getElementById('stagingFilterContainer');
+                 const stagingList = globalSlaData.map(item => normalizeSlaRow(item).staging || 'TANPA STAGING');
+                 const uniqueStagings = [...new Set(stagingList)].sort();
+
+                 if (uniqueStagings.length > 0) {
+                     stagingContainer.innerHTML = '';
+                     uniqueStagings.forEach(staging => {
+                         const lbl = document.createElement('label');
+                         lbl.className = "cursor-pointer group";
+                         lbl.innerHTML = `
+                             <input type="checkbox" value="${staging}" class="peer hidden staging-filter" checked>
+                             <div class="px-3 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-teal-600 peer-checked:text-white peer-checked:border-teal-600 hover:border-slate-300">${staging}</div>
+                         `;
+                         stagingContainer.appendChild(lbl);
+                     });
+                 }
+                 const produkContainer = document.getElementById('produkFilterContainer');
+                 const produkList = globalSlaData.map(item => normalizeSlaRow(item).produk || 'TANPA PRODUK');
+                 const uniqueProduks = [...new Set(produkList)].sort();
+
+                 if (uniqueProduks.length > 0) {
+                     produkContainer.innerHTML = '';
+                     uniqueProduks.forEach(produk => {
+                         const lbl = document.createElement('label');
+                         lbl.className = "cursor-pointer group";
+                         lbl.innerHTML = `
+                             <input type="checkbox" value="${produk}" class="peer hidden produk-filter" checked>
+                             <div class="px-3 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-xs transition-all peer-checked:bg-cyan-600 peer-checked:text-white peer-checked:border-cyan-600 hover:border-slate-300">${produk}</div>
+                         `;
+                         produkContainer.appendChild(lbl);
+                     });
+                 }
+                 setupFilterListeners();
+                 applyFiltersAndRender();
+             });
+         });
+         function applyFiltersAndRender() {
+             document.getElementById('loadingIndicator').classList.remove('hidden');
+             document.getElementById('loadingIndicator').classList.add('flex');
+             document.getElementById('dashboardContent').classList.add('hidden');
+
+             setTimeout(() => {
+                 processData(globalSlaData, globalContainerData, globalRefDate);
+             }, 50);
+         }
+         function getHubGroup(prefix) {
+             const p = prefix ? prefix.toUpperCase() : "";
+             if (p === "MKS") return "MKS";
+             if (p === "BPP") return "BPP";
+             if (p === "BJM") return "BJM";
+             if (p === "PLK") return "PLK";
+             if (p === "MND") return "MND";
+             if (p === "PAL") return "PAL";
+             if (p === "KDI") return "KDI";
+             if (p === "TAR") return "TAR";
+             return "Gateway";
+         }
+         function processData(slaData, containerData, refDate) {
+             const selectedHubs = Array.from(document.querySelectorAll('.hub-filter:checked')).map(cb => cb.value);
+             const selectedEdds = Array.from(document.querySelectorAll('.edd-filter:checked')).map(cb => cb.value);
+             const selectedFops = Array.from(document.querySelectorAll('.fop-filter:checked')).map(cb => cb.value);
+             const selectedStagings = Array.from(document.querySelectorAll('.staging-filter:checked')).map(cb => cb.value);
+             const selectedProduks = Array.from(document.querySelectorAll('.produk-filter:checked')).map(cb => cb.value);
+             window.tableAwbs = {};
+             const stagingData = {};
+             const produkData = {};
+             const fopMatrixData = {};
+             const awbTargetMap = new Map();
+             slaData.forEach(rawRow => {
+                 const row = normalizeSlaRow(rawRow);
+                 const awb = row.awb;
+                 const staging = row.staging;
+                 const produk = row.produk;
+                 const uz = row.uz;
+                 const eddRaw = row.edd;
+                 const fopRaw = row.fop || 'KOSONG';
+                 const stagingFilterVal = staging || 'TANPA STAGING';
+                 const produkFilterVal = produk || 'TANPA PRODUK';
+                 if (!awb || !eddRaw) return;
+                 if (awb.startsWith('5100')) return;
+                 if (selectedFops.length > 0 && !selectedFops.includes(fopRaw)) return;
+                 if (selectedStagings.length > 0 && !selectedStagings.includes(stagingFilterVal)) return;
+                 if (selectedProduks.length > 0 && !selectedProduks.includes(produkFilterVal)) return;
+                 const eddParts = eddRaw.split(' ')[0];
+                 const edd = new Date(eddParts);
+                 edd.setHours(0, 0, 0, 0);
+                 if (isNaN(edd)) return;
+                 const diffTime = edd - refDate;
+                 const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+                 let category = diffDays < 0 ? "After EDD" : diffDays === 0 ? "Last Day" : (diffDays > 0 && diffDays <= 2) ? "Sameday" : ">2 Hari";
+                 let eddCategory = diffDays < 0 ? "<0" : diffDays <= 4 ? diffDays.toString() : ">4";
+                 const uzPrefix = uz ? uz.substring(0, 3) : "";
+                 const destHub = getHubGroup(uzPrefix);
+                 if (selectedHubs.includes(destHub)) {
+                     awbTargetMap.set(awb, eddCategory);
+                     if (selectedEdds.includes(eddCategory)) {
+                         let stagingKey = destHub === "Gateway" ? "Gateway" : (staging || `${destHub} (Tanpa Staging)`);
+                         const compKey = `${destHub}::${stagingKey}`;
+
+                         if (!stagingData[compKey]) stagingData[compKey] = {};
+                         if (!stagingData[compKey][category]) stagingData[compKey][category] = [];
+                         stagingData[compKey][category].push(awb);
+                         if (produk) {
+                             if (!produkData[produk]) produkData[produk] = {};
+                             if (!produkData[produk][category]) produkData[produk][category] = [];
+                             produkData[produk][category].push(awb);
+                         }
+                         if (!fopMatrixData[destHub]) fopMatrixData[destHub] = {};
+                         if (!fopMatrixData[destHub][fopRaw]) fopMatrixData[destHub][fopRaw] = [];
+                         fopMatrixData[destHub][fopRaw].push(awb);
+                     }
+                 }
+             });
+             const containerAbsoluteTotalMap = {};
+             containerData.forEach(rawRow => {
+                 const row = normalizeContainerRow(rawRow);
+                 const containerNo = row.containerNo;
+                 const awb = row.awb;
+                 if (containerNo && awb) containerAbsoluteTotalMap[containerNo] = (containerAbsoluteTotalMap[containerNo] || 0) + 1;
+             });
+             const containerTargetMap = {};
+             containerData.forEach(rawRow => {
+                 const row = normalizeContainerRow(rawRow);
+                 const awb = row.awb;
+                 const containerNo = row.containerNo;
+                 const zoneCode = row.zoneCode;
+                 if (awb && containerNo && awbTargetMap.has(awb)) {
+                     const eddCategory = awbTargetMap.get(awb);
+                     if (selectedEdds.includes(eddCategory)) {
+                         if (!containerTargetMap[containerNo]) {
+                             containerTargetMap[containerNo] = { count: 0, zone: zoneCode || '-', breakdown: {}, totalAwbInContainer: containerAbsoluteTotalMap[containerNo] || 0 };
+                         }
+                         containerTargetMap[containerNo].count += 1;
+                         if (!containerTargetMap[containerNo].breakdown[eddCategory]) containerTargetMap[containerNo].breakdown[eddCategory] = [];
+                         containerTargetMap[containerNo].breakdown[eddCategory].push(awb);
+                     }
+                 }
+             });
+             const dateStr = refDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+             renderTable('tableStagingContainer', stagingData, 'Estimasi Inbound Tgl ' + dateStr, 'Tujuan,Staging Destinasi');
+             renderTable('tableProdukContainer', produkData, 'Service', 'Produk');
+             renderContainerTable('tableContainerSameday', containerTargetMap, 'Data Container Berdasarkan Filter');
+             renderFopMatrixTable('tableFopContainer', fopMatrixData, 'Sebaran FOP Berdasarkan Tujuan', selectedFops);
+             document.getElementById('loadingIndicator').classList.add('hidden');
+             document.getElementById('loadingIndicator').classList.remove('flex');
+             document.getElementById('dashboardContent').classList.remove('hidden');
+             document.getElementById('screenshotBtn').classList.remove('hidden');
+         }
+         const btnCopyTpl = (contId, key) => `<button onclick="copyAwbs('${contId}', '${key}', this)" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 bg-slate-800 text-white border border-slate-700 px-3 py-1.5 rounded shadow-xl z-10 font-semibold text-[10px] uppercase tracking-wide flex items-center transition-all transform scale-90 group-hover:scale-100">📋 Salin</button>`;
+         function renderTable(containerId, dataObj, title, rowLabel) {
+             const container = document.getElementById(containerId);
+             const isMultiCol = rowLabel.includes(',');
+             const labels = isMultiCol ? rowLabel.split(',') : [rowLabel];
+             window.tableAwbs[containerId] = {};
+             let thLabels = labels.map(lbl => `<th class="py-3 px-4 font-bold tracking-wider">${lbl}</th>`).join('');
+
+             let html = `
+                 <div class="p-5 border-b border-slate-200 bg-white flex items-center justify-between">
+                     <h2 class="text-base font-bold text-slate-800">${title}</h2>
+                 </div>
+                 <div class="overflow-x-auto custom-scrollbar">
+                     <table class="w-full text-left text-xs text-slate-600">
+                         <thead class="bg-slate-50/80 text-slate-500 uppercase border-b border-slate-200">
+                             <tr>
+                                 ${thLabels}
+                                 <th class="py-3 px-3 text-center font-bold tracking-wider text-red-500">After EDD</th>
+                                 <th class="py-3 px-3 text-center font-bold tracking-wider text-orange-500">Last Day</th>
+                                 <th class="py-3 px-3 text-center font-bold tracking-wider text-amber-500">Sameday</th>
+                                 <th class="py-3 px-3 text-center font-bold tracking-wider text-emerald-500">>2 Hari</th>
+                                 <th class="py-3 px-3 text-center font-bold tracking-wider text-slate-700">Total</th>
+                                 <th class="py-3 px-4 text-center font-bold tracking-wider text-purple-600">SLA MAX</th>
+                             </tr>
+                         </thead>
+                         <tbody class="divide-y divide-slate-100">
+             `;
+             let grandTotals = { "After EDD": 0, "Last Day": 0, "Sameday": 0, ">2 Hari": 0, "Total": 0 };
+             let grandTotalAwbs = { "After EDD": [], "Last Day": [], "Sameday": [], ">2 Hari": [], "Total": [] };
+
+             let rowData = Object.keys(dataObj).map(key => {
+                 const row = dataObj[key];
+                 const afterArr = row['After EDD'] || [];
+                 const lastArr = row['Last Day'] || [];
+                 const sameArr = row['Sameday'] || [];
+                 const moreArr = row['>2 Hari'] || [];
+                 const totalArr = afterArr.concat(lastArr, sameArr, moreArr);
+                 const parts = isMultiCol ? key.split('::') : [key];
+                 return { key, part0: parts[0], part1: parts[1] || '', after: afterArr.length, last: lastArr.length, same: sameArr.length, more: moreArr.length, total: totalArr.length, afterArr, lastArr, sameArr, moreArr, totalArr };
+             });
+             rowData.sort((a, b) => {
+                 if (isMultiCol) {
+                     const r = n => ({'MKS':1,'BPP':2,'BJM':3,'PLK':4,'MND':5,'PAL':6,'KDI':7,'TAR':8,'Gateway':9}[n] || 99);
+                     if (r(a.part0) !== r(b.part0)) return r(a.part0) - r(b.part0);
+                 }
+                 return b.total - a.total;
+             });
+             let rowSpans = {};
+             if (isMultiCol) rowData.forEach(r => rowSpans[r.part0] = (rowSpans[r.part0] || 0) + 1);
+             const makeBodyCell = (key, count, colorTheme) => {
+                 if (count === 0) return `<td class="py-2.5 px-3 text-center"><span class="text-slate-300 font-medium">-</span></td>`;
+                 const themeClasses = {
+                     red: 'bg-red-50 text-red-600 group-hover:bg-red-100',
+                     orange: 'bg-orange-50 text-orange-600 group-hover:bg-orange-100',
+                     amber: 'bg-amber-50 text-amber-600 group-hover:bg-amber-100',
+                     emerald: 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100',
+                     slate: 'bg-slate-100 text-slate-700 group-hover:bg-slate-200'
+                 }[colorTheme];
+                 return `
+                     <td class="py-2.5 px-3 text-center relative group cursor-pointer" title="Klik untuk salin resi">
+                         <span class="group-hover:opacity-0 transition-opacity inline-flex items-center justify-center min-w-[2.5rem] px-2 py-1 rounded-md font-bold text-[11px] ${themeClasses}">${count.toLocaleString('id-ID')}</span>
+                         ${btnCopyTpl(containerId, key)}
+                     </td>
+                 `;
+             };
+             if (rowData.length === 0) {
+                 html += `<tr><td colspan="${isMultiCol ? 8 : 7}" class="py-8 text-center text-slate-400 italic">Tidak ada data sesuai filter.</td></tr>`;
+             } else {
+                 let rIdx = 0, renderedPart0 = {};
+                 for (const row of rowData) {
+                     grandTotalAwbs["After EDD"] = grandTotalAwbs["After EDD"].concat(row.afterArr);
+                     grandTotalAwbs["Last Day"] = grandTotalAwbs["Last Day"].concat(row.lastArr);
+                     grandTotalAwbs["Sameday"] = grandTotalAwbs["Sameday"].concat(row.sameArr);
+                     grandTotalAwbs[">2 Hari"] = grandTotalAwbs[">2 Hari"].concat(row.moreArr);
+                     grandTotalAwbs["Total"] = grandTotalAwbs["Total"].concat(row.totalArr);
+                     grandTotals["After EDD"] += row.after; grandTotals["Last Day"] += row.last; grandTotals["Sameday"] += row.same; grandTotals[">2 Hari"] += row.more; grandTotals["Total"] += row.total;
+                     window.tableAwbs[containerId][`r${rIdx}_after`] = row.afterArr;
+                     window.tableAwbs[containerId][`r${rIdx}_last`] = row.lastArr;
+                     window.tableAwbs[containerId][`r${rIdx}_same`] = row.sameArr;
+                     window.tableAwbs[containerId][`r${rIdx}_more`] = row.moreArr;
+                     window.tableAwbs[containerId][`r${rIdx}_total`] = row.totalArr;
+                     let tdLabels = '';
+                     if (isMultiCol) {
+                         if (!renderedPart0[row.part0]) {
+                             tdLabels += `<td class="py-2.5 px-4 font-semibold text-slate-900 whitespace-nowrap align-middle border-r border-slate-100 bg-white" rowspan="${rowSpans[row.part0]}">${row.part0}</td>`;
+                             renderedPart0[row.part0] = true;
+                         }
+                         tdLabels += `<td class="py-2.5 px-4 font-medium text-slate-700 whitespace-nowrap">${row.part1}</td>`;
+                     } else {
+                         tdLabels = `<td class="py-2.5 px-4 font-semibold text-slate-900 whitespace-nowrap">${row.part0}</td>`;
+                     }
+                     html += `
+                         <tr class="hover:bg-slate-50/80 transition-colors border-b border-transparent hover:border-slate-100">
+                             ${tdLabels}
+                             ${makeBodyCell(`r${rIdx}_after`, row.after, 'red')}
+                             ${makeBodyCell(`r${rIdx}_last`, row.last, 'orange')}
+                             ${makeBodyCell(`r${rIdx}_same`, row.same, 'amber')}
+                             ${makeBodyCell(`r${rIdx}_more`, row.more, 'emerald')}
+                             ${makeBodyCell(`r${rIdx}_total`, row.total, 'slate')}
+                             <td class="py-2.5 px-4 text-center font-extrabold text-purple-600">${row.total > 0 ? (((row.same + row.more) / row.total) * 100).toFixed(1) + '%' : '-'}</td>
+                         </tr>
+                     `;
+                     rIdx++;
+                 }
+             }
+             Object.assign(window.tableAwbs[containerId], grandTotalAwbs);
+             const makeTfootCell = (cat, colorTheme) => {
+                 const count = grandTotals[cat];
+                 if (count === 0) return `<td class="py-4 px-3 text-center text-slate-400">-</td>`;
+                 const themeClasses = {
+                     red: 'text-red-600', orange: 'text-orange-600', amber: 'text-amber-600',
+                     emerald: 'text-emerald-600', slate: 'text-slate-800'
+                 }[colorTheme];
+                 return `
+                     <td class="py-4 px-3 text-center relative group cursor-pointer" title="Salin total ${cat}">
+                         <span class="group-hover:opacity-0 transition-opacity block font-extrabold text-sm ${themeClasses}">${count.toLocaleString('id-ID')}</span>
+                         ${btnCopyTpl(containerId, cat)}
+                     </td>
+                 `;
+             };
+             html += `
+                         </tbody>
+                         <tfoot class="bg-slate-50 border-t-2 border-slate-200 shadow-inner">
+                             <tr>
+                                 <td class="py-4 px-4 font-bold text-slate-700 uppercase tracking-wider text-[11px]" colspan="${isMultiCol ? 2 : 1}">Total Keseluruhan</td>
+                                 ${makeTfootCell("After EDD", "red")}
+                                 ${makeTfootCell("Last Day", "orange")}
+                                 ${makeTfootCell("Sameday", "amber")}
+                                 ${makeTfootCell(">2 Hari", "emerald")}
+                                 ${makeTfootCell("Total", "slate")}
+                                 <td class="py-4 px-4 text-center font-extrabold text-purple-700 text-sm">${grandTotals["Total"] > 0 ? (((grandTotals["Sameday"] + grandTotals[">2 Hari"]) / grandTotals["Total"]) * 100).toFixed(1) + '%' : '-'}</td>
+                             </tr>
+                         </tfoot>
+                     </table>
+                 </div>
+             `;
+             container.innerHTML = html;
+         }
+         function renderContainerTable(containerId, dataObj, title) {
+             const container = document.getElementById(containerId);
+             window.tableAwbs[containerId] = {};
+             const sortedData = Object.entries(dataObj).sort((a, b) => b[1].count - a[1].count);
+             const allContainersText = sortedData.map(item => item[0]).join('\n');
+
+             let html = `
+                 <div class="p-5 border-b border-slate-200 bg-white flex justify-between items-center">
+                     <h2 class="text-base font-bold text-slate-800">${title}</h2>
+                     <div class="flex gap-3 items-center">
+                         ${sortedData.length > 0 ? `
+                         <button onclick="copyToClipboard('${allContainersText.replace(/\n/g, '\\\n')}', this)" class="text-xs bg-white hover:bg-slate-50 text-slate-600 font-semibold px-3 py-1.5 rounded-lg border border-slate-300 shadow-sm transition-all flex items-center gap-1.5">
+                             <span>📋</span> Salin Semua Container
+                         </button>` : ''}
+                     </div>
+                 </div>
+                 <div class="max-h-[500px] overflow-y-auto custom-scrollbar relative">
+                     <table class="w-full text-left text-xs text-slate-600">
+                         <thead class="bg-slate-50/95 backdrop-blur-sm text-slate-500 uppercase border-b border-slate-200 sticky top-0 z-20">
+                             <tr>
+                                 <th class="py-3 px-4 font-bold tracking-wider whitespace-nowrap">No. Container</th>
+                                 <th class="py-3 px-2 text-center font-bold tracking-wider text-slate-700" title="Kapasitas total">Isi</th>
+                                 <th class="py-3 px-2 text-center font-bold tracking-wider text-red-500">&lt;0</th>
+                                 <th class="py-3 px-2 text-center font-bold tracking-wider text-brand-500">H+0</th>
+                                 <th class="py-3 px-2 text-center font-bold tracking-wider text-brand-500">H+1</th>
+                                 <th class="py-3 px-2 text-center font-bold tracking-wider text-brand-500">H+2</th>
+                                 <th class="py-3 px-2 text-center font-bold tracking-wider text-brand-500">H+3</th>
+                                 <th class="py-3 px-2 text-center font-bold tracking-wider text-brand-500">H+4</th>
+                                 <th class="py-3 px-2 text-center font-bold tracking-wider text-brand-500">&gt;4</th>
+                                 <th class="py-3 px-3 text-center font-bold tracking-wider text-slate-700">Filter</th>
+                             </tr>
+                         </thead>
+                         <tbody class="divide-y divide-slate-100">
+             `;
+             let ctTot = { '<0': 0, '0': 0, '1': 0, '2': 0, '3': 0, '4': 0, '>4': 0, 'Total': 0, 'TotalIsi': 0 };
+             let ctAwb = { '<0': [], '0': [], '1': [], '2': [], '3': [], '4': [], '>4': [], 'Total': [] };
+             const makeContBodyCell = (key, count, isRed, isTotal) => {
+                 if (count === 0) return `<td class="py-2.5 px-2 text-center"><span class="text-slate-300">-</span></td>`;
+                 const bg = isTotal ? 'bg-slate-100 text-slate-800' : (isRed ? 'bg-red-50 text-red-600' : 'bg-brand-50 text-brand-700');
+                 return `
+                     <td class="py-2.5 px-2 text-center relative group cursor-pointer" title="Salin resi">
+                         <span class="group-hover:opacity-0 transition-opacity inline-flex items-center justify-center min-w-[2rem] px-1.5 py-1 rounded font-bold text-[11px] ${bg}">${count.toLocaleString('id-ID')}</span>
+                         ${btnCopyTpl(containerId, key)}
+                     </td>
+                 `;
+             };
+             if (sortedData.length === 0) {
+                 html += `<tr><td colspan="10" class="py-8 text-center text-slate-400 italic">Tidak ada Container dengan resi target.</td></tr>`;
+             } else {
+                 let rIdx = 0;
+                 for (const [containerNo, info] of sortedData) {
+                     const b = info.breakdown;
+                     const aL=b['<0']||[], a0=b['0']||[], a1=b['1']||[], a2=b['2']||[], a3=b['3']||[], a4=b['4']||[], aM=b['>4']||[];
+                     const totArr = aL.concat(a0,a1,a2,a3,a4,aM);
+                     ctAwb['<0'].push(...aL); ctAwb['0'].push(...a0); ctAwb['1'].push(...a1); ctAwb['2'].push(...a2); ctAwb['3'].push(...a3); ctAwb['4'].push(...a4); ctAwb['>4'].push(...aM); ctAwb['Total'].push(...totArr);
+                     ctTot['<0']+=aL.length; ctTot['0']+=a0.length; ctTot['1']+=a1.length; ctTot['2']+=a2.length; ctTot['3']+=a3.length; ctTot['4']+=a4.length; ctTot['>4']+=aM.length; ctTot['Total']+=totArr.length; ctTot['TotalIsi']+=info.totalAwbInContainer;
+                     window.tableAwbs[containerId][`r${rIdx}_<0`] = aL; window.tableAwbs[containerId][`r${rIdx}_0`] = a0; window.tableAwbs[containerId][`r${rIdx}_1`] = a1; window.tableAwbs[containerId][`r${rIdx}_2`] = a2; window.tableAwbs[containerId][`r${rIdx}_3`] = a3; window.tableAwbs[containerId][`r${rIdx}_4`] = a4; window.tableAwbs[containerId][`r${rIdx}_>4`] = aM; window.tableAwbs[containerId][`r${rIdx}_Total`] = totArr;
+                     html += `
+                         <tr class="hover:bg-slate-50 transition-colors">
+                             <td class="py-2.5 px-4 font-semibold text-slate-800 flex items-center justify-between group/row">
+                                 <span class="font-mono">${containerNo}</span>
+                                 <button onclick="copyToClipboard('${containerNo}', this)" class="text-slate-300 hover:text-brand-600 opacity-0 group-hover/row:opacity-100 transition-opacity" title="Salin nomor container">
+                                     📋
+                                 </button>
+                             </td>
+                             <td class="py-2.5 px-2 text-center text-slate-500 font-semibold bg-slate-50/50">${info.totalAwbInContainer.toLocaleString('id-ID')}</td>
+                             ${makeContBodyCell(`r${rIdx}_<0`, aL.length, true, false)}
+                             ${makeContBodyCell(`r${rIdx}_0`, a0.length, false, false)}
+                             ${makeContBodyCell(`r${rIdx}_1`, a1.length, false, false)}
+                             ${makeContBodyCell(`r${rIdx}_2`, a2.length, false, false)}
+                             ${makeContBodyCell(`r${rIdx}_3`, a3.length, false, false)}
+                             ${makeContBodyCell(`r${rIdx}_4`, a4.length, false, false)}
+                             ${makeContBodyCell(`r${rIdx}_>4`, aM.length, false, false)}
+                             ${makeContBodyCell(`r${rIdx}_Total`, totArr.length, false, true)}
+                         </tr>
+                     `;
+                     rIdx++;
+                 }
+             }
+             Object.assign(window.tableAwbs[containerId], ctAwb);
+             const makeContTfootCell = (cat, isRed, isTotal) => {
+                 const count = ctTot[cat];
+                 if (count === 0) return `<td class="py-4 px-2 text-center text-slate-400">-</td>`;
+                 const tc = isTotal ? 'text-slate-800' : (isRed ? 'text-red-600' : 'text-brand-600');
+                 return `
+                     <td class="py-4 px-2 text-center relative group cursor-pointer" title="Salin total filter">
+                         <span class="group-hover:opacity-0 transition-opacity block font-extrabold text-sm ${tc}">${count.toLocaleString('id-ID')}</span>
+                         ${btnCopyTpl(containerId, cat)}
+                     </td>
+                 `;
+             };
+             html += `
+                         </tbody>
+                         <tfoot class="bg-slate-50 border-t-2 border-slate-200 shadow-inner sticky bottom-0 z-20">
+                             <tr>
+                                 <td class="py-4 px-4 font-bold text-slate-700 uppercase tracking-wider text-[11px]">Total Filter</td>
+                                 <td class="py-4 px-2 text-center font-bold text-slate-500 bg-slate-100/50">${ctTot['TotalIsi'].toLocaleString('id-ID')}</td>
+                                 ${makeContTfootCell('<0', true, false)}
+                                 ${makeContTfootCell('0', false, false)}
+                                 ${makeContTfootCell('1', false, false)}
+                                 ${makeContTfootCell('2', false, false)}
+                                 ${makeContTfootCell('3', false, false)}
+                                 ${makeContTfootCell('4', false, false)}
+                                 ${makeContTfootCell('>4', false, false)}
+                                 ${makeContTfootCell('Total', false, true)}
+                             </tr>
+                         </tfoot>
+                     </table>
+                 </div>
+             `;
+             container.innerHTML = html;
+         }
+         function renderFopMatrixTable(containerId, dataObj, title, fopColumns) {
+             const container = document.getElementById(containerId);
+             window.tableAwbs[containerId] = {};
+             const sortedCols = [...fopColumns].sort();
+             let thCols = sortedCols.map(col => `<th class="py-3 px-3 text-center font-bold tracking-wider text-brand-600">${col}</th>`).join('');
+             let html = `
+                 <div class="p-5 border-b border-slate-200 bg-white flex justify-between items-center">
+                     <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                         <span class="text-brand-500">📈</span>
+                         ${title}
+                     </h2>
+                 </div>
+                 <div class="overflow-x-auto max-h-96 custom-scrollbar">
+                     <table class="w-full text-left text-xs text-slate-600 relative">
+                         <thead class="bg-slate-50/90 backdrop-blur-sm text-slate-500 uppercase border-b border-slate-200 sticky top-0 z-10">
+                             <tr>
+                                 <th class="py-3 px-4 font-bold tracking-wider border-r border-slate-200">Tujuan</th>
+                                 ${thCols}
+                                 <th class="py-3 px-4 text-center font-bold tracking-wider text-slate-700 bg-slate-100/50">Total</th>
+                             </tr>
+                         </thead>
+                         <tbody class="divide-y divide-slate-100">
+             `;
+             let grandTotals = { Total: 0 };
+             let grandTotalAwbs = { Total: [] };
+             sortedCols.forEach(col => { grandTotals[col] = 0; grandTotalAwbs[col] = []; });
+             let rowData = Object.keys(dataObj).map(hub => {
+                 const row = dataObj[hub];
+                 let rowTotalArr = [], rowCols = {};
+                 sortedCols.forEach(col => {
+                     const arr = row[col] || [];
+                     rowCols[col] = { count: arr.length, awbs: arr };
+                     rowTotalArr = rowTotalArr.concat(arr);
+                 });
+                 return { hub, rowCols, total: rowTotalArr.length, totalArr: rowTotalArr };
+             });
+             rowData.sort((a, b) => {
+                 const r = n => ({'MKS':1,'BPP':2,'BJM':3,'PLK':4,'MND':5,'PAL':6,'KDI':7,'TAR':8,'Gateway':9}[n] || 99);
+                 return r(a.hub) - r(b.hub);
+             });
+             if (rowData.length === 0) {
+                 html += `<tr><td colspan="${sortedCols.length + 2}" class="py-8 text-center text-slate-400 italic">Tidak ada data.</td></tr>`;
+             } else {
+                 let rIdx = 0;
+                 for (const row of rowData) {
+                     html += `<tr class="hover:bg-slate-50 transition-colors">
+                                 <td class="py-2.5 px-4 font-semibold text-slate-900 whitespace-nowrap border-r border-slate-100">${row.hub}</td>`;
+                     sortedCols.forEach(col => {
+                         const cell = row.rowCols[col];
+                         grandTotals[col] += cell.count;
+                         grandTotalAwbs[col] = grandTotalAwbs[col].concat(cell.awbs);
+                         window.tableAwbs[containerId][`r${rIdx}_${col}`] = cell.awbs;
+
+                         if (cell.count === 0) {
+                             html += `<td class="py-2.5 px-3 text-center text-slate-300">-</td>`;
+                         } else {
+                             html += `
+                                 <td class="py-2.5 px-3 text-center relative group cursor-pointer" title="Salin resi">
+                                     <span class="group-hover:opacity-0 transition-opacity inline-flex items-center justify-center min-w-[2.5rem] px-2 py-1 rounded-md font-bold text-[11px] bg-brand-50 text-brand-700">${cell.count.toLocaleString('id-ID')}</span>
+                                     ${btnCopyTpl(containerId, `r${rIdx}_${col}`)}
+                                 </td>`;
+                         }
+                     });
+                     grandTotals.Total += row.total;
+                     grandTotalAwbs.Total = grandTotalAwbs.Total.concat(row.totalArr);
+                     window.tableAwbs[containerId][`r${rIdx}_Total`] = row.totalArr;
+                     if (row.total === 0) {
+                         html += `<td class="py-2.5 px-4 text-center font-medium text-slate-400 bg-slate-50/50">-</td></tr>`;
+                     } else {
+                         html += `
+                             <td class="py-2.5 px-4 text-center relative group cursor-pointer bg-slate-50/50" title="Salin resi">
+                                 <span class="group-hover:opacity-0 transition-opacity inline-flex items-center justify-center min-w-[3rem] px-2 py-1 rounded-md font-extrabold text-[12px] bg-slate-200 text-slate-800">${row.total.toLocaleString('id-ID')}</span>
+                                 ${btnCopyTpl(containerId, `r${rIdx}_Total`)}
+                             </td></tr>`;
+                     }
+                     rIdx++;
+                 }
+             }
+             Object.assign(window.tableAwbs[containerId], grandTotalAwbs);
+             const makeTfootCell = (cat, isTotal) => {
+                 const count = grandTotals[cat];
+                 if (count === 0) return `<td class="py-4 px-3 text-center text-slate-400">-</td>`;
+                 const tc = isTotal ? 'text-slate-800' : 'text-brand-600';
+                 return `
+                     <td class="py-4 px-3 text-center relative group cursor-pointer" title="Salin semua resi untuk ${cat}">
+                         <span class="group-hover:opacity-0 transition-opacity block font-extrabold text-sm ${tc}">${count.toLocaleString('id-ID')}</span>
+                         ${btnCopyTpl(containerId, cat)}
+                     </td>
+                 `;
+             };
+             html += `
+                         </tbody>
+                         <tfoot class="bg-slate-50 border-t-2 border-slate-200 shadow-inner">
+                             <tr>
+                                 <td class="py-4 px-4 font-bold text-slate-700 uppercase tracking-wider text-[11px] border-r border-slate-200">Total Keseluruhan</td>
+                                 ${sortedCols.map(col => makeTfootCell(col, false)).join('')}
+                                 ${makeTfootCell('Total', true)}
+                             </tr>
+                         </tfoot>
+                     </table>
+                 </div>
+             `;
+             container.innerHTML = html;
+         }
+         document.getElementById('screenshotBtn').addEventListener('click', async () => {
+             const btn = document.getElementById('screenshotBtn');
+             const originalHTML = btn.innerHTML;
+             btn.innerHTML = 'Memproses...';
+
+             const element = document.getElementById('dashboardContent');
+             try {
+                 const canvas = await html2canvas(element, { scale: 2, backgroundColor: "#f8fafc" });
+                 const link = document.createElement('a');
+                 link.download = `SLA-Container-${new Date().toISOString().slice(0,10)}.png`;
+                 link.href = canvas.toDataURL('image/png');
+                 link.click();
+
+                 btn.innerHTML = '✓ Diunduh';
+                 setTimeout(() => btn.innerHTML = originalHTML, 3000);
+             } catch (err) {
+                 console.error(err);
+                 alert('Gagal memproses gambar.');
+                 btn.innerHTML = originalHTML;
+             }
+         });
+     </script>
+ </body>
+ </html>
