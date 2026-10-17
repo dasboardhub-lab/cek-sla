@@ -204,7 +204,9 @@
          <div id="dashboardContent" class="hidden fade-in space-y-8">
 
              <div id="tableFopContainer" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"></div>
-             <div class="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
+             
+             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+                 <!-- Kolom 1 (Kiri): Estimasi Staging & Panduan -->
                  <div class="space-y-6">
                      <div id="tableStagingContainer" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"></div>
 
@@ -224,8 +226,14 @@
                      </div>
                  </div>
 
-                 <div class="space-y-8">
+                 <!-- Kolom 2 (Tengah): Service (Atas) & Origin Hub (Bawah) -->
+                 <div class="space-y-6">
                      <div id="tableProdukContainer" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"></div>
+                     <div id="tableOriginHubContainer" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"></div>
+                 </div>
+
+                 <!-- Kolom 3 (Kanan): Data Container -->
+                 <div class="space-y-6">
                      <div id="tableContainerSameday" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"></div>
                  </div>
              </div>
@@ -320,7 +328,8 @@
                  produk: clean['service_code'] || clean['produk'] || clean['service'] || '',
                  uz: clean['destination_hub'] || clean['destination_uz'] || clean['hub'] || '',
                  edd: clean['expect_delivery_tm'] || clean['edd'] || '',
-                 fop: clean['latest_op_code'] || clean['fop_code_internal'] || clean['fop'] || 'KOSONG'
+                 fop: clean['latest_op_code'] || clean['fop_code_internal'] || clean['fop'] || 'KOSONG',
+                 origin_hub: clean['origin_hub'] || clean['originhub'] || 'KOSONG'
              };
          }
          function normalizeContainerRow(row) {
@@ -440,11 +449,14 @@
              const selectedFops = Array.from(document.querySelectorAll('.fop-filter:checked')).map(cb => cb.value);
              const selectedStagings = Array.from(document.querySelectorAll('.staging-filter:checked')).map(cb => cb.value);
              const selectedProduks = Array.from(document.querySelectorAll('.produk-filter:checked')).map(cb => cb.value);
+             
              window.tableAwbs = {};
              const stagingData = {};
              const produkData = {};
              const fopMatrixData = {};
+             const originHubData = {}; // Data object baru untuk Origin Hub
              const awbTargetMap = new Map();
+
              slaData.forEach(rawRow => {
                  const row = normalizeSlaRow(rawRow);
                  const awb = row.awb;
@@ -453,25 +465,33 @@
                  const uz = row.uz;
                  const eddRaw = row.edd;
                  const fopRaw = row.fop || 'KOSONG';
+                 const originHubRaw = row.origin_hub || 'KOSONG'; // Ambil data origin hub
+                 
                  const stagingFilterVal = staging || 'TANPA STAGING';
                  const produkFilterVal = produk || 'TANPA PRODUK';
+
                  if (!awb || !eddRaw) return;
                  if (awb.startsWith('5100')) return;
                  if (selectedFops.length > 0 && !selectedFops.includes(fopRaw)) return;
                  if (selectedStagings.length > 0 && !selectedStagings.includes(stagingFilterVal)) return;
                  if (selectedProduks.length > 0 && !selectedProduks.includes(produkFilterVal)) return;
+
                  const eddParts = eddRaw.split(' ')[0];
                  const edd = new Date(eddParts);
                  edd.setHours(0, 0, 0, 0);
                  if (isNaN(edd)) return;
+
                  const diffTime = edd - refDate;
                  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
                  let category = diffDays < 0 ? "After EDD" : diffDays === 0 ? "Last Day" : (diffDays > 0 && diffDays <= 2) ? "Sameday" : ">2 Hari";
                  let eddCategory = diffDays < 0 ? "<0" : diffDays <= 4 ? diffDays.toString() : ">4";
+                 
                  const uzPrefix = uz ? uz.substring(0, 3) : "";
                  const destHub = getHubGroup(uzPrefix);
+
                  if (selectedHubs.includes(destHub)) {
                      awbTargetMap.set(awb, eddCategory);
+                     
                      if (selectedEdds.includes(eddCategory)) {
                          let stagingKey = destHub === "Gateway" ? "Gateway" : (staging || `${destHub} (Tanpa Staging)`);
                          const compKey = `${destHub}::${stagingKey}`;
@@ -479,17 +499,25 @@
                          if (!stagingData[compKey]) stagingData[compKey] = {};
                          if (!stagingData[compKey][category]) stagingData[compKey][category] = [];
                          stagingData[compKey][category].push(awb);
+
                          if (produk) {
                              if (!produkData[produk]) produkData[produk] = {};
                              if (!produkData[produk][category]) produkData[produk][category] = [];
                              produkData[produk][category].push(awb);
                          }
+
                          if (!fopMatrixData[destHub]) fopMatrixData[destHub] = {};
                          if (!fopMatrixData[destHub][fopRaw]) fopMatrixData[destHub][fopRaw] = [];
                          fopMatrixData[destHub][fopRaw].push(awb);
+
+                         // Populate Origin Hub Data
+                         if (!originHubData[originHubRaw]) originHubData[originHubRaw] = {};
+                         if (!originHubData[originHubRaw][category]) originHubData[originHubRaw][category] = [];
+                         originHubData[originHubRaw][category].push(awb);
                      }
                  }
              });
+
              const containerAbsoluteTotalMap = {};
              containerData.forEach(rawRow => {
                  const row = normalizeContainerRow(rawRow);
@@ -497,12 +525,14 @@
                  const awb = row.awb;
                  if (containerNo && awb) containerAbsoluteTotalMap[containerNo] = (containerAbsoluteTotalMap[containerNo] || 0) + 1;
              });
+
              const containerTargetMap = {};
              containerData.forEach(rawRow => {
                  const row = normalizeContainerRow(rawRow);
                  const awb = row.awb;
                  const containerNo = row.containerNo;
                  const zoneCode = row.zoneCode;
+                 
                  if (awb && containerNo && awbTargetMap.has(awb)) {
                      const eddCategory = awbTargetMap.get(awb);
                      if (selectedEdds.includes(eddCategory)) {
@@ -515,18 +545,49 @@
                      }
                  }
              });
+
+             // --- Grouping Origin Hub Top 15 ---
+             let originHubTotals = Object.keys(originHubData).map(hub => {
+                 let total = 0;
+                 Object.values(originHubData[hub]).forEach(arr => total += arr.length);
+                 return { hub, total };
+             });
+             
+             originHubTotals.sort((a, b) => b.total - a.total);
+             
+             if (originHubTotals.length > 15) {
+                 let lainnyaData = {};
+                 for (let i = 15; i < originHubTotals.length; i++) {
+                     let h = originHubTotals[i].hub;
+                     let cats = originHubData[h];
+                     for (let c in cats) {
+                         if (!lainnyaData[c]) lainnyaData[c] = [];
+                         lainnyaData[c] = lainnyaData[c].concat(cats[c]);
+                     }
+                     delete originHubData[h];
+                 }
+                 originHubData['Lainnya'] = lainnyaData;
+             }
+             // ----------------------------------
+
              const dateStr = refDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-             renderTable('tableStagingContainer', stagingData, 'Estimasi Inbound Tgl ' + dateStr, 'Tujuan,Staging Destinasi');
+             
+             // Menambahkan 'true' agar tinggi tabel Estimasi me-rentang otomatis sesuai data (tanpa scrollbar dalam)
+             renderTable('tableStagingContainer', stagingData, 'Estimasi Inbound Tgl ' + dateStr, 'Tujuan,Staging Destinasi', true);
              renderTable('tableProdukContainer', produkData, 'Service', 'Produk');
+             renderTable('tableOriginHubContainer', originHubData, 'Data SLA Berdasarkan Origin Hub', 'Origin Hub');
              renderContainerTable('tableContainerSameday', containerTargetMap, 'Data Container Berdasarkan Filter');
              renderFopMatrixTable('tableFopContainer', fopMatrixData, 'Sebaran FOP Berdasarkan Tujuan', selectedFops);
+             
              document.getElementById('loadingIndicator').classList.add('hidden');
              document.getElementById('loadingIndicator').classList.remove('flex');
              document.getElementById('dashboardContent').classList.remove('hidden');
              document.getElementById('screenshotBtn').classList.remove('hidden');
          }
+
          const btnCopyTpl = (contId, key) => `<button onclick="copyAwbs('${contId}', '${key}', this)" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 bg-slate-800 text-white border border-slate-700 px-3 py-1.5 rounded shadow-xl z-10 font-semibold text-[10px] uppercase tracking-wide flex items-center transition-all transform scale-90 group-hover:scale-100">📋 Salin</button>`;
-         function renderTable(containerId, dataObj, title, rowLabel) {
+         
+         function renderTable(containerId, dataObj, title, rowLabel, isAutoHeight = false) {
              const container = document.getElementById(containerId);
              const isMultiCol = rowLabel.includes(',');
              const labels = isMultiCol ? rowLabel.split(',') : [rowLabel];
@@ -537,9 +598,9 @@
                  <div class="p-5 border-b border-slate-200 bg-white flex items-center justify-between">
                      <h2 class="text-base font-bold text-slate-800">${title}</h2>
                  </div>
-                 <div class="overflow-x-auto custom-scrollbar">
-                     <table class="w-full text-left text-xs text-slate-600">
-                         <thead class="bg-slate-50/80 text-slate-500 uppercase border-b border-slate-200">
+                 <div class="overflow-x-auto ${isAutoHeight ? '' : 'max-h-96'} custom-scrollbar">
+                     <table class="w-full text-left text-xs text-slate-600 relative">
+                         <thead class="bg-slate-50/95 backdrop-blur-sm text-slate-500 uppercase border-b border-slate-200 sticky top-0 z-20">
                              <tr>
                                  ${thLabels}
                                  <th class="py-3 px-3 text-center font-bold tracking-wider text-red-500">After EDD</th>
@@ -570,6 +631,10 @@
                      const r = n => ({'MKS':1,'BPP':2,'BJM':3,'PLK':4,'MND':5,'PAL':6,'KDI':7,'TAR':8,'Gateway':9}[n] || 99);
                      if (r(a.part0) !== r(b.part0)) return r(a.part0) - r(b.part0);
                  }
+                 // Pastikan row "Lainnya" selalu berada paling bawah
+                 if (a.part0 === 'Lainnya') return 1;
+                 if (b.part0 === 'Lainnya') return -1;
+                 
                  return b.total - a.total;
              });
              let rowSpans = {};
@@ -647,7 +712,7 @@
              };
              html += `
                          </tbody>
-                         <tfoot class="bg-slate-50 border-t-2 border-slate-200 shadow-inner">
+                         <tfoot class="bg-slate-50 border-t-2 border-slate-200 shadow-inner sticky bottom-0 z-20">
                              <tr>
                                  <td class="py-4 px-4 font-bold text-slate-700 uppercase tracking-wider text-[11px]" colspan="${isMultiCol ? 2 : 1}">Total Keseluruhan</td>
                                  ${makeTfootCell("After EDD", "red")}
@@ -867,7 +932,7 @@
              };
              html += `
                          </tbody>
-                         <tfoot class="bg-slate-50 border-t-2 border-slate-200 shadow-inner">
+                         <tfoot class="bg-slate-50 border-t-2 border-slate-200 shadow-inner sticky bottom-0 z-10">
                              <tr>
                                  <td class="py-4 px-4 font-bold text-slate-700 uppercase tracking-wider text-[11px] border-r border-slate-200">Total Keseluruhan</td>
                                  ${sortedCols.map(col => makeTfootCell(col, false)).join('')}
