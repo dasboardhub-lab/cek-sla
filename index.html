@@ -93,7 +93,6 @@
                 <div>
                     <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Area Hub Tujuan</label>
                     <div class="flex flex-wrap gap-2">
-                        <!-- Hub filter checkbokes (disederhanakan kodenya agar ringkas, fungsi sama) -->
                         <label class="cursor-pointer group"><input type="checkbox" value="MKS" class="peer hidden hub-filter" checked><div class="px-3 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-slate-800 peer-checked:text-white peer-checked:border-slate-800">MKS</div></label>
                         <label class="cursor-pointer group"><input type="checkbox" value="BPP" class="peer hidden hub-filter" checked><div class="px-3 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-slate-800 peer-checked:text-white peer-checked:border-slate-800">BPP</div></label>
                         <label class="cursor-pointer group"><input type="checkbox" value="BJM" class="peer hidden hub-filter" checked><div class="px-3 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-slate-800 peer-checked:text-white peer-checked:border-slate-800">BJM</div></label>
@@ -143,7 +142,7 @@
             
             <div id="tableFopContainer" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"></div>
             
-            <!-- Grid 12 kolom untuk 3 bagian tabel sejajar (Kiri 4/12, Tengah 3/12, Kanan 5/12) -->
+            <!-- Grid 12 kolom untuk 3 bagian tabel sejajar -->
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
                 
                 <!-- Kolom 1 (Kiri): Estimasi Staging & Panduan (Porsi 33%) -->
@@ -159,7 +158,7 @@
                             <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-red-600"></div><span class="text-slate-700"><b>After EDD:</b> Lewat SLA</span></div>
                             <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-orange-500"></div><span class="text-slate-700"><b>Last Day:</b> Batas maksimal hari ini</span></div>
                             <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-amber-400"></div><span class="text-slate-700"><b>Nextday:</b> Sisa waktu 1 hari</span></div>
-                            <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-emerald-500"></div><span class="text-slate-700"><b>&gt;=2 Day:</b> Sisa 2 hari atau lebih</span></div>
+                            <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-emerald-500"></div><span class="text-slate-700"><b>&gt;2 Day:</b> Sisa 2 hari atau lebih</span></div>
                             <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-purple-600"></div><span class="text-slate-700"><b>SLA MAX:</b> % Nextday ke atas</span></div>
                         </div>
                         <p class="text-[9px] text-indigo-500/80 font-medium mt-2 italic">*) Paket dengan resi Return (awb 5100xxx) dikecualikan</p>
@@ -197,6 +196,8 @@
             document.getElementById('containerFileLabel').classList.toggle('text-emerald-600', count > 0);
         });
 
+        const btnCopyTpl = (contId, key) => `<button onclick="copyAwbs('${contId}', '${key}', this)" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 bg-slate-800 text-white border border-slate-700 px-2 py-1 rounded shadow-xl z-30 font-semibold text-[9px] uppercase tracking-wide flex items-center transition-all transform scale-90 group-hover:scale-100">Salin</button>`;
+
         window.copyToClipboard = function(text, btnElement) {
             const actualText = text.replace(/\\\n/g, '\n');
             const textarea = document.createElement('textarea');
@@ -230,11 +231,62 @@
             }
             document.body.removeChild(textarea);
         };
+
         window.copyAwbs = function(containerId, category, btnElement) {
             const awbs = window.tableAwbs[containerId]?.[category] || [];
             if (awbs.length === 0) return;
             const text = awbs.join('\n');
             window.copyToClipboard(text, btnElement);
+        };
+
+        window.copyTableTsv = function(containerId, btnElement) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            const table = container.querySelector('table');
+            if (!table) return;
+            let tsv = "";
+            const rows = table.querySelectorAll('tr');
+            rows.forEach(row => {
+                let rowData = [];
+                const cells = row.querySelectorAll('th, td');
+                cells.forEach(cell => {
+                    let clone = cell.cloneNode(true);
+                    const btns = clone.querySelectorAll('button');
+                    btns.forEach(b => b.remove());
+                    let text = clone.textContent.trim().replace(/\s+/g, ' ');
+                    rowData.push(text);
+                });
+                tsv += rowData.join('\t') + '\n';
+            });
+            window.copyToClipboard(tsv, btnElement);
+        };
+
+        window.downloadSlaExcel = function(hideSafe = false) {
+            let csvContent = "Origin Hub,Service,Status,Staging,AWB\n";
+            for (let key in window.exportMap) {
+                let parts = key.split('|');
+                let origin = parts[0];
+                let service = parts[1];
+                let status = parts[2];
+                let staging = parts[3] || 'TANPA STAGING';
+                let awbs = window.exportMap[key];
+                
+                // Jika unduh dari tabel Origin Hub (hideSafe = true), abaikan resi yang aman (>2 Hari)
+                if (hideSafe && status === ">2 Hari") continue;
+                
+                // Tiap AWB di baris terpisah
+                awbs.forEach(awb => {
+                    csvContent += `"${origin}","${service}","${status}","${staging}","${awb}"\n`;
+                });
+            }
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `Data_SLA_Origin_${new Date().toISOString().slice(0,10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         };
 
         const setupFilterListeners = () => {
@@ -364,6 +416,7 @@
                 if (isNaN(edd)) return;
 
                 const diffDays = Math.round((edd - refDate) / (1000 * 60 * 60 * 24));
+                // Perubahan "Nextday" (1) & ">2 Hari" (>=2)
                 const category = diffDays < 0 ? "After EDD" : diffDays === 0 ? "Last Day" : diffDays === 1 ? "Nextday" : ">2 Hari";
                 const eddCategory = diffDays < 0 ? "<0" : diffDays <= 4 ? diffDays.toString() : ">4";
                 
@@ -392,17 +445,16 @@
                         if (!originHubData[row.origin_hub][category]) originHubData[row.origin_hub][category] = [];
                         originHubData[row.origin_hub][category].push(row.awb);
 
-                        // Menyimpan data untuk Export Excel (Sesuai origin | service | status | list awb)
                         const expOrigin = row.origin_hub || 'KOSONG';
                         const expService = row.produk || 'TANPA PRODUK';
-                        const expKey = `${expOrigin}|${expService}|${category}`;
+                        const expStaging = row.staging || 'TANPA STAGING';
+                        const expKey = `${expOrigin}|${expService}|${category}|${expStaging}`;
                         if (!window.exportMap[expKey]) window.exportMap[expKey] = [];
                         window.exportMap[expKey].push(row.awb);
                     }
                 }
             });
 
-            // Container Mapping
             const containerAbsoluteMap = {};
             containerData.forEach(r => {
                 const row = normalizeContainerRow(r);
@@ -423,93 +475,84 @@
                 }
             });
 
-            // Grouping Origin Hub Top 15 + Lainnya (HANYA MENAMPILKAN YANG URGENT)
-            let ohTotals = Object.keys(originHubData).map(hub => {
-                let urgentCnt = (originHubData[hub]['After EDD']||[]).length + 
-                                (originHubData[hub]['Last Day']||[]).length + 
-                                (originHubData[hub]['Nextday']||[]).length;
-                return { hub, urgentCnt };
-            }).filter(item => item.urgentCnt > 0).sort((a, b) => b.urgentCnt - a.urgentCnt); // Hapus origin yang urgentCnt = 0
-            
-            let tempOriginHubData = { ...originHubData };
-            // Kosongkan originHubData untuk diisi ulang dengan data yang sudah disortir & difilter
-            for (let k in originHubData) delete originHubData[k];
-            
-            let lainnyaData = {};
-            for (let i = 0; i < ohTotals.length; i++) {
-                let h = ohTotals[i].hub;
-                if (i < 15) {
-                    originHubData[h] = tempOriginHubData[h];
+            let ohStats = Object.keys(originHubData).map(hub => {
+                let aft = (originHubData[hub]['After EDD'] || []);
+                let lst = (originHubData[hub]['Last Day'] || []);
+                let nxt = (originHubData[hub]['Nextday'] || []);
+                let mor = (originHubData[hub]['>2 Hari'] || []);
+                let urgentCnt = aft.length + lst.length + nxt.length; // Hanya After EDD, Last Day, Nextday
+                let trueTot = urgentCnt + mor.length;
+                return { hub, urgentCnt, trueTot, aft, lst, nxt, mor };
+            }).filter(item => item.urgentCnt > 0) // Eksekusi: Hapus/sembunyikan jika tidak ada resi urgent
+              .sort((a, b) => b.urgentCnt - a.urgentCnt);
+
+            let finalOriginHubData = {};
+            let lainnyaAft = [], lainnyaLst = [], lainnyaNxt = [], lainnyaMor = [];
+            let lainnyaTrueTot = 0;
+
+            ohStats.forEach((item, index) => {
+                if (index < 15) {
+                    finalOriginHubData[item.hub] = {
+                        'After EDD': item.aft,
+                        'Last Day': item.lst,
+                        'Nextday': item.nxt,
+                        '>2 Hari': item.mor,
+                        'TrueTotal': item.trueTot
+                    };
                 } else {
-                    for (let c in tempOriginHubData[h]) {
-                        if (!lainnyaData[c]) lainnyaData[c] = [];
-                        lainnyaData[c] = lainnyaData[c].concat(tempOriginHubData[h][c]);
-                    }
+                    lainnyaAft.push(...item.aft);
+                    lainnyaLst.push(...item.lst);
+                    lainnyaNxt.push(...item.nxt);
+                    lainnyaMor.push(...item.mor);
+                    lainnyaTrueTot += item.trueTot;
                 }
-            }
-            if (Object.keys(lainnyaData).length > 0) {
-                originHubData['Lainnya'] = lainnyaData;
+            });
+
+            if (lainnyaAft.length > 0 || lainnyaLst.length > 0 || lainnyaNxt.length > 0) {
+                finalOriginHubData['Lainnya'] = {
+                    'After EDD': lainnyaAft,
+                    'Last Day': lainnyaLst,
+                    'Nextday': lainnyaNxt,
+                    '>2 Hari': lainnyaMor,
+                    'TrueTotal': lainnyaTrueTot
+                };
             }
 
-            // Render UI
             const dateStr = refDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-            
-            // Mengatur isAutoHeight = true pada semua pemanggilan fungsi render agar tinggi tabel menyesuaikan konten
-            renderTable('tableStagingContainer', stagingData, 'Estimasi Inbound Tgl ' + dateStr, 'Tujuan,Staging', true, false);
-            renderTable('tableProdukContainer', produkData, 'Service', 'Produk', true, true);
-            renderTable('tableOriginHubContainer', originHubData, 'Origin Hub', 'Origin Hub', true, true, true); // Tambahan 'true' di akhir untuk menyembunyikan >2 Hari
-            renderContainerTable('tableContainerSameday', containerTargetMap, 'Data Container Filter', true);
-            renderFopMatrixTable('tableFopContainer', fopMatrixData, 'Sebaran FOP Tujuan', selectedFops, true);
-            
+            renderTable('tableStagingContainer', stagingData, 'Estimasi Inbound Tgl ' + dateStr, 'Tujuan,Staging Destinasi', false, false);
+            renderTable('tableProdukContainer', produkData, 'Service', 'Produk', true, false);
+            renderTable('tableOriginHubContainer', finalOriginHubData, 'Data SLA Origin Hub (Darurat)', 'Origin Hub', true, true);
+            renderContainerTable('tableContainerSameday', containerTargetMap, 'Data Container Berdasarkan Filter');
+            renderFopMatrixTable('tableFopContainer', fopMatrixData, 'Sebaran FOP Berdasarkan Tujuan', selectedFops);
+
             document.getElementById('loadingIndicator').classList.add('hidden');
             document.getElementById('loadingIndicator').classList.remove('flex');
             document.getElementById('dashboardContent').classList.remove('hidden');
             document.getElementById('screenshotBtn').classList.remove('hidden');
         }
 
-        const btnCopyTpl = (contId, key) => `<button onclick="copyAwbs('${contId}', '${key}', this)" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 bg-slate-800 text-white border border-slate-700 px-2 py-0.5 rounded shadow z-10 font-semibold text-[8px] uppercase tracking-wide transition-all transform scale-90 group-hover:scale-100">Salin</button>`;
-
-        window.downloadSlaExcel = function(hideSafe = false) {
-            let csvContent = "Origin Hub,Service,Status,AWB\n";
-            for (let key in window.exportMap) {
-                let parts = key.split('|');
-                let origin = parts[0];
-                let service = parts[1];
-                let status = parts[2];
-                let awbs = window.exportMap[key];
-                
-                // Jika didownload dari tabel Origin Hub (hideSafe = true), abaikan resi yang >2 Hari
-                if (hideSafe && status === ">2 Hari") continue;
-                
-                // Mengurai setiap AWB menjadi 1 baris ke bawah (1 AWB = 1 Cell/Baris)
-                awbs.forEach(awb => {
-                    csvContent += `"${origin}","${service}","${status}","${awb}"\n`;
-                });
-            }
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.setAttribute("href", url);
-            link.setAttribute("download", `Data_SLA_${new Date().toISOString().slice(0,10)}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        };
-
-        function renderTable(containerId, dataObj, title, rowLabel, isAutoHeight, showDownload = false, hideSafeSla = false) {
+        function renderTable(containerId, dataObj, title, rowLabel, showDownload = false, hideSafeSla = false) {
             const container = document.getElementById(containerId);
             const isMultiCol = rowLabel.includes(',');
             const labels = isMultiCol ? rowLabel.split(',') : [rowLabel];
             window.tableAwbs[containerId] = {};
             let thLabels = labels.map(lbl => `<th class="py-1.5 px-2 font-bold">${lbl}</th>`).join('');
 
-            // Tampilan rapat, font lebih kecil
+            let actionBtn = '';
+            if (showDownload) {
+                if (hideSafeSla) {
+                    actionBtn = `<button onclick="downloadSlaExcel(${hideSafeSla})" class="text-[9px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2 py-0.5 rounded shadow-sm transition-all flex items-center gap-1">📥 Unduh Excel</button>`;
+                } else {
+                    actionBtn = `<button onclick="copyTableTsv('${containerId}', this)" class="text-[9px] bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-2 py-0.5 rounded shadow-sm transition-all flex items-center gap-1">📋 Salin Data</button>`;
+                }
+            }
+
             let html = `
                 <div class="p-2 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
                     <h2 class="text-[11px] font-extrabold text-slate-800">${title}</h2>
-                    ${showDownload ? `<button onclick="downloadSlaExcel(${hideSafeSla})" class="text-[9px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2 py-0.5 rounded shadow-sm transition-all flex items-center gap-1">📥 Unduh Excel</button>` : ''}
+                    ${actionBtn}
                 </div>
-                <div class="overflow-x-auto ${isAutoHeight ? '' : 'max-h-96'} custom-scrollbar">
+                <div class="overflow-x-auto custom-scrollbar">
                     <table class="w-full text-left text-[10px] text-slate-600 relative">
                         <thead class="bg-white/95 backdrop-blur text-[9px] text-slate-500 uppercase border-b border-slate-200 sticky top-0 z-20">
                             <tr>
@@ -519,7 +562,7 @@
                                 <th class="py-1.5 px-2 text-center font-bold tracking-wider text-amber-500">Nextday</th>
                                 ${hideSafeSla ? '' : '<th class="py-1.5 px-2 text-center font-bold tracking-wider text-emerald-500">&gt;2 Day</th>'}
                                 <th class="py-1.5 px-2 text-center font-bold tracking-wider text-slate-700">Total</th>
-                                <th class="py-1.5 px-2 text-center font-bold tracking-wider text-purple-600">%</th>
+                                <th class="py-1.5 px-2 text-center font-bold tracking-wider text-purple-600">${hideSafeSla ? '% RISK' : '% SLA MAX'}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
@@ -529,13 +572,14 @@
 
             let rowData = Object.keys(dataObj).map(key => {
                 const r = dataObj[key];
-                const aft = r['After EDD']||[], lst = r['Last Day']||[], sam = r['Nextday']||[], mor = r['>2 Hari']||[];
-                const tot = hideSafeSla ? aft.concat(lst, sam) : aft.concat(lst, sam, mor);
-                const trueTot = aft.length + lst.length + sam.length + mor.length;
-                const urgentTot = aft.length + lst.length + sam.length;
+                const aft = r['After EDD']||[], lst = r['Last Day']||[], nxt = r['Nextday']||[], mor = r['>2 Hari']||[];
+                const tot = hideSafeSla ? aft.concat(lst, nxt) : aft.concat(lst, nxt, mor);
+                const trueTot = r.TrueTotal || (aft.length + lst.length + nxt.length + mor.length); // Deteksi TrueTotal
+                const urgentTot = aft.length + lst.length + nxt.length;
                 const p = isMultiCol ? key.split('::') : [key];
-                return { key, p0: p[0], p1: p[1]||'', a: aft, l: lst, s: sam, m: hideSafeSla ? [] : mor, t: tot, trueTot: trueTot, urgentTot: urgentTot };
+                return { key, p0: p[0], p1: p[1]||'', a: aft, l: lst, n: nxt, m: hideSafeSla ? [] : mor, t: tot, trueTot: trueTot, urgentTot: urgentTot };
             });
+
             rowData.sort((a, b) => {
                 if (isMultiCol) {
                     const r = n => ({'MKS':1,'BPP':2,'BJM':3,'PLK':4,'MND':5,'PAL':6,'KDI':7,'TAR':8,'Gateway':9}[n] || 99);
@@ -558,25 +602,46 @@
             else {
                 let rIdx = 0, rendP0 = {};
                 for (const r of rowData) {
-                    gTotalAwbs["After EDD"].push(...r.a); gTotalAwbs["Last Day"].push(...r.l); gTotalAwbs["Nextday"].push(...r.s); gTotalAwbs[">2 Hari"].push(...r.m); gTotalAwbs["Total"].push(...r.t);
-                    gTotals["After EDD"]+=r.a.length; gTotals["Last Day"]+=r.l.length; gTotals["Nextday"]+=r.s.length; gTotals[">2 Hari"]+=r.m.length; gTotals["Total"]+=r.t.length; gTotals["TrueTotal"]+=r.trueTot;
+                    gTotalAwbs["After EDD"].push(...r.a); gTotalAwbs["Last Day"].push(...r.l); gTotalAwbs["Nextday"].push(...r.n); gTotalAwbs[">2 Hari"].push(...r.m); gTotalAwbs["Total"].push(...r.t);
+                    gTotals["After EDD"]+=r.a.length; gTotals["Last Day"]+=r.l.length; gTotals["Nextday"]+=r.n.length; gTotals[">2 Hari"]+=r.m.length; gTotals["Total"]+=r.t.length; gTotals["TrueTotal"]+=r.trueTot;
                     
-                    window.tableAwbs[containerId][`r${rIdx}_a`] = r.a; window.tableAwbs[containerId][`r${rIdx}_l`] = r.l; window.tableAwbs[containerId][`r${rIdx}_s`] = r.s; window.tableAwbs[containerId][`r${rIdx}_m`] = r.m; window.tableAwbs[containerId][`r${rIdx}_t`] = r.t;
+                    window.tableAwbs[containerId][`r${rIdx}_a`] = r.a; window.tableAwbs[containerId][`r${rIdx}_l`] = r.l; window.tableAwbs[containerId][`r${rIdx}_s`] = r.n; window.tableAwbs[containerId][`r${rIdx}_m`] = r.m; window.tableAwbs[containerId][`r${rIdx}_t`] = r.t;
                     
                     let tds = '';
+                    let isNewGroup = isMultiCol && !rendP0[r.p0];
                     if (isMultiCol) {
-                        if (!rendP0[r.p0]) { tds += `<td class="py-1 px-2 font-semibold text-slate-900 align-middle border-r border-slate-100" rowspan="${rowSpans[r.p0]}">${r.p0}</td>`; rendP0[r.p0] = true; }
+                        if (isNewGroup) { 
+                            tds += `<td class="py-1 px-2 font-bold text-slate-900 align-middle border-r-2 border-slate-300 bg-slate-100/50" rowspan="${rowSpans[r.p0]}">${r.p0}</td>`; 
+                            rendP0[r.p0] = true; 
+                        }
                         tds += `<td class="py-1 px-2 font-medium truncate max-w-[80px]" title="${r.p1}">${r.p1}</td>`;
-                    } else { tds = `<td class="py-1 px-2 font-semibold text-slate-900 truncate max-w-[100px]">${r.p0}</td>`; }
-                    
-                    let pct = '-';
-                    if (hideSafeSla) {
-                        if (r.trueTot > 0) pct = ((r.urgentTot / r.trueTot) * 100).toFixed(2).replace('.', ',') + '%';
-                    } else {
-                        if (r.t.length > 0) pct = (((r.s.length + r.m.length) / r.t.length) * 100).toFixed(2).replace('.', ',') + '%';
+                    } else { 
+                        tds = `<td class="py-1 px-2 font-semibold text-slate-900 truncate max-w-[100px]">${r.p0}</td>`; 
                     }
                     
-                    html += `<tr class="hover:bg-slate-50 transition-colors border-b border-transparent">${tds}${mCell(`r${rIdx}_a`, r.a.length, 'r')}${mCell(`r${rIdx}_l`, r.l.length, 'o')}${mCell(`r${rIdx}_s`, r.s.length, 'a')}${hideSafeSla ? '' : mCell(`r${rIdx}_m`, r.m.length, 'e')}${mCell(`r${rIdx}_t`, r.t.length, 's')}<td class="py-1 px-1 text-center font-bold text-purple-600 text-[9px]">${pct}</td></tr>`;
+                    let pct = '-';
+                    let pctVal = 0;
+                    if (hideSafeSla) {
+                        if (r.trueTot > 0) {
+                            pctVal = (r.urgentTot / r.trueTot) * 100;
+                            pct = pctVal.toFixed(2).replace('.', ',') + '%';
+                        }
+                    } else {
+                        if (r.t.length > 0) {
+                            pctVal = ((r.n.length + r.m.length) / r.t.length) * 100;
+                            pct = pctVal.toFixed(2).replace('.', ',') + '%';
+                        }
+                    }
+                    
+                    // Indikator warna SLA MAX: Merah jika < 98%, Hijau jika >= 98%
+                    let pctColorClass = "text-purple-600";
+                    if (pct !== '-') {
+                        pctColorClass = pctVal < 98 ? "text-red-600 font-bold" : "text-emerald-600 font-bold";
+                    }
+                    
+                    let rowBorderClass = (isNewGroup && rIdx > 0) ? '!border-t-[3px] !border-t-slate-300' : 'border-b border-transparent';
+                    
+                    html += `<tr class="hover:bg-slate-50 transition-colors ${rowBorderClass}">${tds}${mCell(`r${rIdx}_a`, r.a.length, 'r')}${mCell(`r${rIdx}_l`, r.l.length, 'o')}${mCell(`r${rIdx}_s`, r.n.length, 'a')}${hideSafeSla ? '' : mCell(`r${rIdx}_m`, r.m.length, 'e')}${mCell(`r${rIdx}_t`, r.t.length, 's')}<td class="py-1.5 px-2 text-center text-[10px] ${pctColorClass}">${pct}</td></tr>`;
                     rIdx++;
                 }
             }
@@ -588,27 +653,38 @@
             };
             
             let fPct = '-';
+            let fPctVal = 0;
             if (hideSafeSla) {
-                if (gTotals["TrueTotal"] > 0) fPct = ((gTotals["Total"] / gTotals["TrueTotal"]) * 100).toFixed(2).replace('.', ',') + '%';
+                if (gTotals["TrueTotal"] > 0) {
+                    fPctVal = (gTotals["Total"] / gTotals["TrueTotal"]) * 100;
+                    fPct = fPctVal.toFixed(2).replace('.', ',') + '%';
+                }
             } else {
-                if (gTotals["Total"] > 0) fPct = (((gTotals["Nextday"] + gTotals[">2 Hari"]) / gTotals["Total"]) * 100).toFixed(2).replace('.', ',') + '%';
+                if (gTotals["Total"] > 0) {
+                    fPctVal = ((gTotals["Nextday"] + gTotals[">2 Hari"]) / gTotals["Total"]) * 100;
+                    fPct = fPctVal.toFixed(2).replace('.', ',') + '%';
+                }
+            }
+
+            let fPctColorClass = "text-purple-700";
+            if (fPct !== '-') {
+                fPctColorClass = fPctVal < 98 ? "text-red-600 font-extrabold" : "text-emerald-600 font-extrabold";
             }
 
             html += `</tbody><tfoot class="bg-slate-100 border-t border-slate-200 sticky bottom-0 z-20"><tr>
                         <td class="py-2 px-2 font-bold text-slate-700 uppercase text-[9px]" colspan="${isMultiCol ? 2 : 1}">Total</td>
                         ${mFoot("After EDD", "text-red-600")}${mFoot("Last Day", "text-orange-600")}${mFoot("Nextday", "text-amber-600")}${hideSafeSla ? '' : mFoot(">2 Hari", "text-emerald-600")}${mFoot("Total", "text-slate-800")}
-                        <td class="py-2 px-1 text-center font-extrabold text-purple-700 text-[10px]">${fPct}</td>
+                        <td class="py-2 px-2 text-center text-[10px] ${fPctColorClass}">${fPct}</td>
                     </tr></tfoot></table></div>`;
             container.innerHTML = html;
         }
 
-        function renderContainerTable(containerId, dataObj, title, isAutoHeight) {
+        function renderContainerTable(containerId, dataObj, title) {
             const container = document.getElementById(containerId);
             window.tableAwbs[containerId] = {};
             const sortedData = Object.entries(dataObj).sort((a, b) => b[1].count - a[1].count);
             const allContainersText = sortedData.map(item => item[0]).join('\n');
             
-            // Menyimpan teks daftar container di memori agar aman dari error string escape (\\\n)
             window.currentContainerList = window.currentContainerList || {};
             window.currentContainerList[containerId] = allContainersText;
 
@@ -617,7 +693,7 @@
                     <h2 class="text-[11px] font-extrabold text-slate-800">${title}</h2>
                     ${sortedData.length > 0 ? `<button onclick="copyToClipboard(window.currentContainerList['${containerId}'], this)" class="text-[9px] bg-white hover:bg-slate-100 text-slate-600 font-bold px-2 py-0.5 rounded border shadow-sm transition-all flex items-center gap-1">📋 Salin Container</button>` : ''}
                 </div>
-                <div class="${isAutoHeight ? '' : 'max-h-[500px]'} overflow-y-auto custom-scrollbar relative">
+                <div class="overflow-y-auto custom-scrollbar relative">
                     <table class="w-full text-left text-[10px] text-slate-600">
                         <thead class="bg-white/95 backdrop-blur text-[9px] text-slate-500 uppercase border-b border-slate-200 sticky top-0 z-20">
                             <tr>
@@ -680,7 +756,7 @@
             container.innerHTML = html;
         }
 
-        function renderFopMatrixTable(containerId, dataObj, title, fopColumns, isAutoHeight) {
+        function renderFopMatrixTable(containerId, dataObj, title, fopColumns) {
             const container = document.getElementById(containerId);
             window.tableAwbs[containerId] = {};
             const sCols = [...fopColumns].sort();
@@ -689,7 +765,7 @@
                 <div class="p-2 border-b border-slate-200 bg-slate-50 flex items-center">
                     <h2 class="text-[11px] font-extrabold text-slate-800 flex items-center gap-1.5"><span class="text-brand-500">📈</span> ${title}</h2>
                 </div>
-                <div class="${isAutoHeight ? '' : 'max-h-96'} overflow-x-auto custom-scrollbar">
+                <div class="overflow-x-auto custom-scrollbar">
                     <table class="w-full text-left text-[10px] text-slate-600 relative">
                         <thead class="bg-white/95 backdrop-blur text-[9px] text-slate-500 uppercase border-b border-slate-200 sticky top-0 z-10">
                             <tr><th class="py-1.5 px-2 font-bold border-r border-slate-200">Tujuan</th>${thCols}<th class="py-1.5 px-2 text-center font-bold text-slate-700 bg-slate-100/50">Total</th></tr>
