@@ -158,9 +158,9 @@
                             <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-slate-400"></div><span class="text-slate-700"><b>Estimasi:</b> Diproses Tgl tsb</span></div>
                             <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-red-600"></div><span class="text-slate-700"><b>After EDD:</b> Lewat SLA</span></div>
                             <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-orange-500"></div><span class="text-slate-700"><b>Last Day:</b> Batas maksimal hari ini</span></div>
-                            <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-amber-400"></div><span class="text-slate-700"><b>Sameday:</b> Sisa waktu 1-2 hari</span></div>
-                            <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-emerald-500"></div><span class="text-slate-700"><b>>2 Hari:</b> Sisa waktu > 2 hari</span></div>
-                            <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-purple-600"></div><span class="text-slate-700"><b>SLA MAX:</b> % Status aman</span></div>
+                            <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-amber-400"></div><span class="text-slate-700"><b>Nextday:</b> Sisa waktu 1 hari</span></div>
+                            <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-emerald-500"></div><span class="text-slate-700"><b>&gt;=2 Day:</b> Sisa 2 hari atau lebih</span></div>
+                            <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-purple-600"></div><span class="text-slate-700"><b>SLA MAX:</b> % Nextday ke atas</span></div>
                         </div>
                         <p class="text-[9px] text-indigo-500/80 font-medium mt-2 italic">*) Paket dengan resi Return (awb 5100xxx) dikecualikan</p>
                     </div>
@@ -364,7 +364,7 @@
                 if (isNaN(edd)) return;
 
                 const diffDays = Math.round((edd - refDate) / (1000 * 60 * 60 * 24));
-                const category = diffDays < 0 ? "After EDD" : diffDays === 0 ? "Last Day" : (diffDays > 0 && diffDays <= 2) ? "Sameday" : ">2 Hari";
+                const category = diffDays < 0 ? "After EDD" : diffDays === 0 ? "Last Day" : diffDays === 1 ? "Nextday" : ">2 Hari";
                 const eddCategory = diffDays < 0 ? "<0" : diffDays <= 4 ? diffDays.toString() : ">4";
                 
                 const destHub = getHubGroup(row.uz ? row.uz.substring(0, 3) : "");
@@ -423,21 +423,31 @@
                 }
             });
 
-            // Grouping Origin Hub Top 15 + Lainnya
+            // Grouping Origin Hub Top 15 + Lainnya (HANYA MENAMPILKAN YANG URGENT)
             let ohTotals = Object.keys(originHubData).map(hub => {
-                let t = 0; Object.values(originHubData[hub]).forEach(a => t += a.length); return { hub, total: t };
-            }).sort((a, b) => b.total - a.total);
+                let urgentCnt = (originHubData[hub]['After EDD']||[]).length + 
+                                (originHubData[hub]['Last Day']||[]).length + 
+                                (originHubData[hub]['Nextday']||[]).length;
+                return { hub, urgentCnt };
+            }).filter(item => item.urgentCnt > 0).sort((a, b) => b.urgentCnt - a.urgentCnt); // Hapus origin yang urgentCnt = 0
             
-            if (ohTotals.length > 15) {
-                let lainnyaData = {};
-                for (let i = 15; i < ohTotals.length; i++) {
-                    let h = ohTotals[i].hub;
-                    for (let c in originHubData[h]) {
+            let tempOriginHubData = { ...originHubData };
+            // Kosongkan originHubData untuk diisi ulang dengan data yang sudah disortir & difilter
+            for (let k in originHubData) delete originHubData[k];
+            
+            let lainnyaData = {};
+            for (let i = 0; i < ohTotals.length; i++) {
+                let h = ohTotals[i].hub;
+                if (i < 15) {
+                    originHubData[h] = tempOriginHubData[h];
+                } else {
+                    for (let c in tempOriginHubData[h]) {
                         if (!lainnyaData[c]) lainnyaData[c] = [];
-                        lainnyaData[c] = lainnyaData[c].concat(originHubData[h][c]);
+                        lainnyaData[c] = lainnyaData[c].concat(tempOriginHubData[h][c]);
                     }
-                    delete originHubData[h];
                 }
+            }
+            if (Object.keys(lainnyaData).length > 0) {
                 originHubData['Lainnya'] = lainnyaData;
             }
 
@@ -447,7 +457,7 @@
             // Mengatur isAutoHeight = true pada semua pemanggilan fungsi render agar tinggi tabel menyesuaikan konten
             renderTable('tableStagingContainer', stagingData, 'Estimasi Inbound Tgl ' + dateStr, 'Tujuan,Staging', true, false);
             renderTable('tableProdukContainer', produkData, 'Service', 'Produk', true, true);
-            renderTable('tableOriginHubContainer', originHubData, 'Origin Hub', 'Origin Hub', true, true);
+            renderTable('tableOriginHubContainer', originHubData, 'Origin Hub', 'Origin Hub', true, true, true); // Tambahan 'true' di akhir untuk menyembunyikan >2 Hari
             renderContainerTable('tableContainerSameday', containerTargetMap, 'Data Container Filter', true);
             renderFopMatrixTable('tableFopContainer', fopMatrixData, 'Sebaran FOP Tujuan', selectedFops, true);
             
@@ -459,7 +469,7 @@
 
         const btnCopyTpl = (contId, key) => `<button onclick="copyAwbs('${contId}', '${key}', this)" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 bg-slate-800 text-white border border-slate-700 px-2 py-0.5 rounded shadow z-10 font-semibold text-[8px] uppercase tracking-wide transition-all transform scale-90 group-hover:scale-100">Salin</button>`;
 
-        window.downloadSlaExcel = function() {
+        window.downloadSlaExcel = function(hideSafe = false) {
             let csvContent = "Origin Hub,Service,Status,AWB\n";
             for (let key in window.exportMap) {
                 let parts = key.split('|');
@@ -467,6 +477,9 @@
                 let service = parts[1];
                 let status = parts[2];
                 let awbs = window.exportMap[key];
+                
+                // Jika didownload dari tabel Origin Hub (hideSafe = true), abaikan resi yang >2 Hari
+                if (hideSafe && status === ">2 Hari") continue;
                 
                 // Mengurai setiap AWB menjadi 1 baris ke bawah (1 AWB = 1 Cell/Baris)
                 awbs.forEach(awb => {
@@ -483,7 +496,7 @@
             document.body.removeChild(link);
         };
 
-        function renderTable(containerId, dataObj, title, rowLabel, isAutoHeight, showDownload = false) {
+        function renderTable(containerId, dataObj, title, rowLabel, isAutoHeight, showDownload = false, hideSafeSla = false) {
             const container = document.getElementById(containerId);
             const isMultiCol = rowLabel.includes(',');
             const labels = isMultiCol ? rowLabel.split(',') : [rowLabel];
@@ -494,32 +507,34 @@
             let html = `
                 <div class="p-2 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
                     <h2 class="text-[11px] font-extrabold text-slate-800">${title}</h2>
-                    ${showDownload ? `<button onclick="downloadSlaExcel()" class="text-[9px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2 py-0.5 rounded shadow-sm transition-all flex items-center gap-1">📥 Unduh Excel</button>` : ''}
+                    ${showDownload ? `<button onclick="downloadSlaExcel(${hideSafeSla})" class="text-[9px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2 py-0.5 rounded shadow-sm transition-all flex items-center gap-1">📥 Unduh Excel</button>` : ''}
                 </div>
                 <div class="overflow-x-auto ${isAutoHeight ? '' : 'max-h-96'} custom-scrollbar">
                     <table class="w-full text-left text-[10px] text-slate-600 relative">
                         <thead class="bg-white/95 backdrop-blur text-[9px] text-slate-500 uppercase border-b border-slate-200 sticky top-0 z-20">
                             <tr>
                                 ${thLabels}
-                                <th class="py-1.5 px-1 text-center font-bold text-red-500"><0</th>
-                                <th class="py-1.5 px-1 text-center font-bold text-orange-500">0</th>
-                                <th class="py-1.5 px-1 text-center font-bold text-amber-500">1-2</th>
-                                <th class="py-1.5 px-1 text-center font-bold text-emerald-500">>2</th>
-                                <th class="py-1.5 px-1.5 text-center font-bold text-slate-700">Total</th>
-                                <th class="py-1.5 px-1 text-center font-bold text-purple-600">%</th>
+                                <th class="py-1.5 px-2 text-center font-bold tracking-wider text-red-500">After EDD</th>
+                                <th class="py-1.5 px-2 text-center font-bold tracking-wider text-orange-500">Last Day</th>
+                                <th class="py-1.5 px-2 text-center font-bold tracking-wider text-amber-500">Nextday</th>
+                                ${hideSafeSla ? '' : '<th class="py-1.5 px-2 text-center font-bold tracking-wider text-emerald-500">&gt;2 Day</th>'}
+                                <th class="py-1.5 px-2 text-center font-bold tracking-wider text-slate-700">Total</th>
+                                <th class="py-1.5 px-2 text-center font-bold tracking-wider text-purple-600">%</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
             `;
-            let gTotals = { "After EDD": 0, "Last Day": 0, "Sameday": 0, ">2 Hari": 0, "Total": 0 };
-            let gTotalAwbs = { "After EDD": [], "Last Day": [], "Sameday": [], ">2 Hari": [], "Total": [] };
+            let gTotals = { "After EDD": 0, "Last Day": 0, "Nextday": 0, ">2 Hari": 0, "Total": 0, "TrueTotal": 0 };
+            let gTotalAwbs = { "After EDD": [], "Last Day": [], "Nextday": [], ">2 Hari": [], "Total": [] };
 
             let rowData = Object.keys(dataObj).map(key => {
                 const r = dataObj[key];
-                const aft = r['After EDD']||[], lst = r['Last Day']||[], sam = r['Sameday']||[], mor = r['>2 Hari']||[];
-                const tot = aft.concat(lst, sam, mor);
+                const aft = r['After EDD']||[], lst = r['Last Day']||[], sam = r['Nextday']||[], mor = r['>2 Hari']||[];
+                const tot = hideSafeSla ? aft.concat(lst, sam) : aft.concat(lst, sam, mor);
+                const trueTot = aft.length + lst.length + sam.length + mor.length;
+                const urgentTot = aft.length + lst.length + sam.length;
                 const p = isMultiCol ? key.split('::') : [key];
-                return { key, p0: p[0], p1: p[1]||'', a: aft, l: lst, s: sam, m: mor, t: tot };
+                return { key, p0: p[0], p1: p[1]||'', a: aft, l: lst, s: sam, m: hideSafeSla ? [] : mor, t: tot, trueTot: trueTot, urgentTot: urgentTot };
             });
             rowData.sort((a, b) => {
                 if (isMultiCol) {
@@ -539,12 +554,12 @@
                 return `<td class="py-1 px-1 text-center relative group cursor-pointer"><span class="group-hover:opacity-0 transition-opacity flex justify-center min-w-[1.25rem] px-1 py-0.5 rounded font-bold text-[9px] ${tc}">${count.toLocaleString('id-ID')}</span>${btnCopyTpl(containerId, k)}</td>`;
             };
 
-            if (rowData.length === 0) { html += `<tr><td colspan="${isMultiCol ? 8 : 7}" class="py-4 text-center italic">Tidak ada data.</td></tr>`; } 
+            if (rowData.length === 0) { html += `<tr><td colspan="${isMultiCol ? 8 : (hideSafeSla ? 6 : 7)}" class="py-4 text-center italic">Tidak ada data.</td></tr>`; } 
             else {
                 let rIdx = 0, rendP0 = {};
                 for (const r of rowData) {
-                    gTotalAwbs["After EDD"].push(...r.a); gTotalAwbs["Last Day"].push(...r.l); gTotalAwbs["Sameday"].push(...r.s); gTotalAwbs[">2 Hari"].push(...r.m); gTotalAwbs["Total"].push(...r.t);
-                    gTotals["After EDD"]+=r.a.length; gTotals["Last Day"]+=r.l.length; gTotals["Sameday"]+=r.s.length; gTotals[">2 Hari"]+=r.m.length; gTotals["Total"]+=r.t.length;
+                    gTotalAwbs["After EDD"].push(...r.a); gTotalAwbs["Last Day"].push(...r.l); gTotalAwbs["Nextday"].push(...r.s); gTotalAwbs[">2 Hari"].push(...r.m); gTotalAwbs["Total"].push(...r.t);
+                    gTotals["After EDD"]+=r.a.length; gTotals["Last Day"]+=r.l.length; gTotals["Nextday"]+=r.s.length; gTotals[">2 Hari"]+=r.m.length; gTotals["Total"]+=r.t.length; gTotals["TrueTotal"]+=r.trueTot;
                     
                     window.tableAwbs[containerId][`r${rIdx}_a`] = r.a; window.tableAwbs[containerId][`r${rIdx}_l`] = r.l; window.tableAwbs[containerId][`r${rIdx}_s`] = r.s; window.tableAwbs[containerId][`r${rIdx}_m`] = r.m; window.tableAwbs[containerId][`r${rIdx}_t`] = r.t;
                     
@@ -554,8 +569,14 @@
                         tds += `<td class="py-1 px-2 font-medium truncate max-w-[80px]" title="${r.p1}">${r.p1}</td>`;
                     } else { tds = `<td class="py-1 px-2 font-semibold text-slate-900 truncate max-w-[100px]">${r.p0}</td>`; }
                     
-                    let pct = r.t.length > 0 ? (((r.s.length + r.m.length) / r.t.length) * 100).toFixed(0) + '%' : '-';
-                    html += `<tr class="hover:bg-slate-50 transition-colors border-b border-transparent">${tds}${mCell(`r${rIdx}_a`, r.a.length, 'r')}${mCell(`r${rIdx}_l`, r.l.length, 'o')}${mCell(`r${rIdx}_s`, r.s.length, 'a')}${mCell(`r${rIdx}_m`, r.m.length, 'e')}${mCell(`r${rIdx}_t`, r.t.length, 's')}<td class="py-1 px-1 text-center font-bold text-purple-600 text-[9px]">${pct}</td></tr>`;
+                    let pct = '-';
+                    if (hideSafeSla) {
+                        if (r.trueTot > 0) pct = ((r.urgentTot / r.trueTot) * 100).toFixed(2).replace('.', ',') + '%';
+                    } else {
+                        if (r.t.length > 0) pct = (((r.s.length + r.m.length) / r.t.length) * 100).toFixed(2).replace('.', ',') + '%';
+                    }
+                    
+                    html += `<tr class="hover:bg-slate-50 transition-colors border-b border-transparent">${tds}${mCell(`r${rIdx}_a`, r.a.length, 'r')}${mCell(`r${rIdx}_l`, r.l.length, 'o')}${mCell(`r${rIdx}_s`, r.s.length, 'a')}${hideSafeSla ? '' : mCell(`r${rIdx}_m`, r.m.length, 'e')}${mCell(`r${rIdx}_t`, r.t.length, 's')}<td class="py-1 px-1 text-center font-bold text-purple-600 text-[9px]">${pct}</td></tr>`;
                     rIdx++;
                 }
             }
@@ -566,10 +587,16 @@
                 return `<td class="py-2 px-1 text-center relative group cursor-pointer"><span class="group-hover:opacity-0 transition-opacity block font-extrabold text-[10px] ${tClass}">${c.toLocaleString('id-ID')}</span>${btnCopyTpl(containerId, cat)}</td>`;
             };
             
-            let fPct = gTotals["Total"] > 0 ? (((gTotals["Sameday"] + gTotals[">2 Hari"]) / gTotals["Total"]) * 100).toFixed(0) + '%' : '-';
+            let fPct = '-';
+            if (hideSafeSla) {
+                if (gTotals["TrueTotal"] > 0) fPct = ((gTotals["Total"] / gTotals["TrueTotal"]) * 100).toFixed(2).replace('.', ',') + '%';
+            } else {
+                if (gTotals["Total"] > 0) fPct = (((gTotals["Nextday"] + gTotals[">2 Hari"]) / gTotals["Total"]) * 100).toFixed(2).replace('.', ',') + '%';
+            }
+
             html += `</tbody><tfoot class="bg-slate-100 border-t border-slate-200 sticky bottom-0 z-20"><tr>
                         <td class="py-2 px-2 font-bold text-slate-700 uppercase text-[9px]" colspan="${isMultiCol ? 2 : 1}">Total</td>
-                        ${mFoot("After EDD", "text-red-600")}${mFoot("Last Day", "text-orange-600")}${mFoot("Sameday", "text-amber-600")}${mFoot(">2 Hari", "text-emerald-600")}${mFoot("Total", "text-slate-800")}
+                        ${mFoot("After EDD", "text-red-600")}${mFoot("Last Day", "text-orange-600")}${mFoot("Nextday", "text-amber-600")}${hideSafeSla ? '' : mFoot(">2 Hari", "text-emerald-600")}${mFoot("Total", "text-slate-800")}
                         <td class="py-2 px-1 text-center font-extrabold text-purple-700 text-[10px]">${fPct}</td>
                     </tr></tfoot></table></div>`;
             container.innerHTML = html;
