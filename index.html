@@ -536,48 +536,53 @@
             const isMultiCol = rowLabel.includes(',');
             const labels = isMultiCol ? rowLabel.split(',') : [rowLabel];
             window.tableAwbs[containerId] = {};
-            let thLabels = labels.map(lbl => `<th class="py-1.5 px-2 font-bold">${lbl}</th>`).join('');
+            let thLabels = labels.map(lbl => `<th class="py-2.5 px-3 font-bold tracking-wider">${lbl}</th>`).join('');
 
             let actionBtn = '';
             if (showDownload) {
                 if (hideSafeSla) {
-                    actionBtn = `<button onclick="downloadSlaExcel(${hideSafeSla})" class="text-[9px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2 py-0.5 rounded shadow-sm transition-all flex items-center gap-1">📥 Unduh Excel</button>`;
+                    actionBtn = `<button onclick="downloadSlaExcel(${hideSafeSla})" class="text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded shadow-sm transition-all flex items-center gap-1.5"><span>📥</span> Unduh Excel</button>`;
                 } else {
-                    actionBtn = `<button onclick="copyTableTsv('${containerId}', this)" class="text-[9px] bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-2 py-0.5 rounded shadow-sm transition-all flex items-center gap-1">📋 Salin Data</button>`;
+                    actionBtn = `<button onclick="copyTableTsv('${containerId}', this)" class="text-[10px] bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-1.5 rounded shadow-sm transition-all flex items-center gap-1.5"><span>📋</span> Salin Data</button>`;
                 }
             }
 
             let html = `
-                <div class="p-2 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-                    <h2 class="text-[11px] font-extrabold text-slate-800">${title}</h2>
+                <div class="p-4 border-b border-slate-200 bg-white flex items-center justify-between sticky top-0 z-30">
+                    <h2 class="text-sm font-extrabold text-slate-800">${title}</h2>
                     ${actionBtn}
                 </div>
-                <div class="overflow-x-auto custom-scrollbar">
-                    <table class="w-full text-left text-[10px] text-slate-600 relative">
-                        <thead class="bg-white/95 backdrop-blur text-[9px] text-slate-500 uppercase border-b border-slate-200 sticky top-0 z-20">
+                <div class="max-h-full overflow-y-auto overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-left text-[11px] text-slate-600 relative">
+                        <thead class="bg-slate-50/95 backdrop-blur-sm text-[10px] text-slate-500 uppercase border-b border-slate-200 sticky top-0 z-20 shadow-sm">
                             <tr>
                                 ${thLabels}
-                                <th class="py-1.5 px-2 text-center font-bold tracking-wider text-red-500">After EDD</th>
-                                <th class="py-1.5 px-2 text-center font-bold tracking-wider text-orange-500">Last Day</th>
-                                <th class="py-1.5 px-2 text-center font-bold tracking-wider text-amber-500">Nextday</th>
-                                ${hideSafeSla ? '' : '<th class="py-1.5 px-2 text-center font-bold tracking-wider text-emerald-500">&gt;2 Day</th>'}
-                                <th class="py-1.5 px-2 text-center font-bold tracking-wider text-slate-700">Total</th>
-                                <th class="py-1.5 px-2 text-center font-bold tracking-wider text-purple-600">${hideSafeSla ? '% RISK' : '% SLA MAX'}</th>
+                                <th class="py-2.5 px-2 text-center font-bold tracking-wider text-red-500">After EDD</th>
+                                <th class="py-2.5 px-2 text-center font-bold tracking-wider text-orange-500">Last Day</th>
+                                <th class="py-2.5 px-2 text-center font-bold tracking-wider text-amber-500">Nextday</th>
+                                ${hideSafeSla ? '' : '<th class="py-2.5 px-2 text-center font-bold tracking-wider text-emerald-500">&gt;2 Day</th>'}
+                                <th class="py-2.5 px-2 text-center font-bold tracking-wider text-slate-700">Total</th>
+                                <th class="py-2.5 px-2 text-center font-bold tracking-wider text-purple-600">${hideSafeSla ? '% DARI TOTAL' : '% SLA MAX'}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
             `;
-            let gTotals = { "After EDD": 0, "Last Day": 0, "Nextday": 0, ">2 Hari": 0, "Total": 0, "TrueTotal": 0 };
+            let gTotals = { "After EDD": 0, "Last Day": 0, "Nextday": 0, ">2 Hari": 0, "Total": 0, "TrueTotal": 0, "TrueMor": 0 };
             let gTotalAwbs = { "After EDD": [], "Last Day": [], "Nextday": [], ">2 Hari": [], "Total": [] };
 
+            let grandTrueTotal = 0;
             let rowData = Object.keys(dataObj).map(key => {
                 const r = dataObj[key];
                 const aft = r['After EDD']||[], lst = r['Last Day']||[], nxt = r['Nextday']||[], mor = r['>2 Hari']||[];
+                
+                const trueMor = mor;
+                const trueTot = r.TrueTotal || (aft.length + lst.length + nxt.length + mor.length);
+                grandTrueTotal += trueTot; // Hitung Global Total AWB untuk semua origin (cth: 5461)
+                
                 const tot = hideSafeSla ? aft.concat(lst, nxt) : aft.concat(lst, nxt, mor);
-                const trueTot = r.TrueTotal || (aft.length + lst.length + nxt.length + mor.length); // Deteksi TrueTotal
-                const urgentTot = aft.length + lst.length + nxt.length;
+                
                 const p = isMultiCol ? key.split('::') : [key];
-                return { key, p0: p[0], p1: p[1]||'', a: aft, l: lst, n: nxt, m: hideSafeSla ? [] : mor, t: tot, trueTot: trueTot, urgentTot: urgentTot };
+                return { key, p0: p[0], p1: p[1]||'', a: aft, l: lst, n: nxt, m: hideSafeSla ? [] : mor, t: tot, trueTot: trueTot, trueMor: trueMor };
             });
 
             rowData.sort((a, b) => {
@@ -593,17 +598,20 @@
             if (isMultiCol) rowData.forEach(r => rowSpans[r.p0] = (rowSpans[r.p0] || 0) + 1);
             
             const mCell = (k, count, cTheme) => {
-                if (count === 0) return `<td class="py-1 px-1 text-center"><span class="text-slate-300">-</span></td>`;
-                const tc = {r:'bg-red-50 text-red-600', o:'bg-orange-50 text-orange-600', a:'bg-amber-50 text-amber-600', e:'bg-emerald-50 text-emerald-600', s:'bg-slate-100 text-slate-700'}[cTheme];
-                return `<td class="py-1 px-1 text-center relative group cursor-pointer"><span class="group-hover:opacity-0 transition-opacity flex justify-center min-w-[1.25rem] px-1 py-0.5 rounded font-bold text-[9px] ${tc}">${count.toLocaleString('id-ID')}</span>${btnCopyTpl(containerId, k)}</td>`;
+                if (count === 0) return `<td class="py-2 px-1 text-center"><span class="text-slate-300 font-medium">-</span></td>`;
+                const tc = {r:'bg-red-50 text-red-600 group-hover:bg-red-100', o:'bg-orange-50 text-orange-600 group-hover:bg-orange-100', a:'bg-amber-50 text-amber-600 group-hover:bg-amber-100', e:'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100', s:'bg-slate-100 text-slate-700 group-hover:bg-slate-200'}[cTheme];
+                return `<td class="py-2 px-1 text-center relative group cursor-pointer" title="Klik salin resi"><span class="group-hover:opacity-0 transition-opacity inline-flex items-center justify-center min-w-[2rem] px-1.5 py-1 rounded font-bold text-[10px] ${tc}">${count.toLocaleString('id-ID')}</span>${btnCopyTpl(containerId, k)}</td>`;
             };
 
-            if (rowData.length === 0) { html += `<tr><td colspan="${isMultiCol ? 8 : (hideSafeSla ? 6 : 7)}" class="py-4 text-center italic">Tidak ada data.</td></tr>`; } 
+            if (rowData.length === 0) { html += `<tr><td colspan="${isMultiCol ? 8 : (hideSafeSla ? 6 : 7)}" class="py-6 text-center text-slate-400 italic">Tidak ada data.</td></tr>`; } 
             else {
                 let rIdx = 0, rendP0 = {};
                 for (const r of rowData) {
                     gTotalAwbs["After EDD"].push(...r.a); gTotalAwbs["Last Day"].push(...r.l); gTotalAwbs["Nextday"].push(...r.n); gTotalAwbs[">2 Hari"].push(...r.m); gTotalAwbs["Total"].push(...r.t);
-                    gTotals["After EDD"]+=r.a.length; gTotals["Last Day"]+=r.l.length; gTotals["Nextday"]+=r.n.length; gTotals[">2 Hari"]+=r.m.length; gTotals["Total"]+=r.t.length; gTotals["TrueTotal"]+=r.trueTot;
+                    
+                    gTotals["After EDD"]+=r.a.length; gTotals["Last Day"]+=r.l.length; gTotals["Nextday"]+=r.n.length; gTotals[">2 Hari"]+=r.m.length; gTotals["Total"]+=r.t.length;
+                    gTotals["TrueTotal"]+=r.trueTot; 
+                    gTotals["TrueMor"]+=r.trueMor.length;
                     
                     window.tableAwbs[containerId][`r${rIdx}_a`] = r.a; window.tableAwbs[containerId][`r${rIdx}_l`] = r.l; window.tableAwbs[containerId][`r${rIdx}_s`] = r.n; window.tableAwbs[containerId][`r${rIdx}_m`] = r.m; window.tableAwbs[containerId][`r${rIdx}_t`] = r.t;
                     
@@ -611,70 +619,71 @@
                     let isNewGroup = isMultiCol && !rendP0[r.p0];
                     if (isMultiCol) {
                         if (isNewGroup) { 
-                            tds += `<td class="py-1 px-2 font-bold text-slate-900 align-middle border-r-2 border-slate-300 bg-slate-100/50" rowspan="${rowSpans[r.p0]}">${r.p0}</td>`; 
+                            tds += `<td class="py-2 px-3 font-bold text-slate-900 align-middle border-r-2 border-slate-300 bg-slate-100/50" rowspan="${rowSpans[r.p0]}">${r.p0}</td>`; 
                             rendP0[r.p0] = true; 
                         }
-                        tds += `<td class="py-1 px-2 font-medium truncate max-w-[80px]" title="${r.p1}">${r.p1}</td>`;
+                        tds += `<td class="py-2 px-3 font-medium text-slate-700 truncate max-w-[120px] bg-slate-50/30" title="${r.p1}">${r.p1}</td>`;
                     } else { 
-                        tds = `<td class="py-1 px-2 font-semibold text-slate-900 truncate max-w-[100px]">${r.p0}</td>`; 
+                        tds = `<td class="py-2 px-3 font-semibold text-slate-900 truncate max-w-[120px] bg-white">${r.p0}</td>`; 
                     }
                     
                     let pct = '-';
-                    let pctVal = 0;
-                    if (hideSafeSla) {
-                        if (r.trueTot > 0) {
-                            pctVal = (r.urgentTot / r.trueTot) * 100;
-                            pct = pctVal.toFixed(2).replace('.', ',') + '%';
-                        }
-                    } else {
-                        if (r.t.length > 0) {
-                            pctVal = ((r.n.length + r.m.length) / r.t.length) * 100;
-                            pct = pctVal.toFixed(2).replace('.', ',') + '%';
-                        }
-                    }
+                    let pctColorClass = "text-slate-400 font-medium";
                     
-                    // Indikator warna SLA MAX: Merah jika < 98%, Hijau jika >= 98%
-                    let pctColorClass = "text-purple-600";
-                    if (pct !== '-') {
-                        pctColorClass = pctVal < 98 ? "text-red-600 font-bold" : "text-emerald-600 font-bold";
+                    if (hideSafeSla) {
+                        // Untuk Origin Hub: Persentase (Urgent / Grand Total Keseluruhan)
+                        if (grandTrueTotal > 0) {
+                            let pctVal = (r.t.length / grandTrueTotal) * 100;
+                            pct = pctVal.toFixed(2).replace('.', ',') + '%';
+                        }
+                        pctColorClass = "text-slate-600 font-bold";
+                    } else {
+                        // Untuk Estimasi & Produk: % SLA MAX
+                        let rowSafeTot = r.n.length + r.trueMor.length;
+                        if (r.trueTot > 0) {
+                            let pctVal = (rowSafeTot / r.trueTot) * 100;
+                            pct = pctVal.toFixed(2).replace('.', ',') + '%';
+                            pctColorClass = pctVal < 98 ? "text-red-600 font-bold" : "text-emerald-600 font-bold";
+                        }
                     }
                     
                     let rowBorderClass = (isNewGroup && rIdx > 0) ? '!border-t-[3px] !border-t-slate-300' : 'border-b border-transparent';
                     
-                    html += `<tr class="hover:bg-slate-50 transition-colors ${rowBorderClass}">${tds}${mCell(`r${rIdx}_a`, r.a.length, 'r')}${mCell(`r${rIdx}_l`, r.l.length, 'o')}${mCell(`r${rIdx}_s`, r.n.length, 'a')}${hideSafeSla ? '' : mCell(`r${rIdx}_m`, r.m.length, 'e')}${mCell(`r${rIdx}_t`, r.t.length, 's')}<td class="py-1.5 px-2 text-center text-[10px] ${pctColorClass}">${pct}</td></tr>`;
+                    html += `<tr class="hover:bg-slate-50 transition-colors ${rowBorderClass}">${tds}${mCell(`r${rIdx}_a`, r.a.length, 'r')}${mCell(`r${rIdx}_l`, r.l.length, 'o')}${mCell(`r${rIdx}_s`, r.n.length, 'a')}${hideSafeSla ? '' : mCell(`r${rIdx}_m`, r.m.length, 'e')}${mCell(`r${rIdx}_t`, r.t.length, 's')}<td class="py-2 px-2 text-center text-[11px] ${pctColorClass}">${pct}</td></tr>`;
                     rIdx++;
                 }
             }
             Object.assign(window.tableAwbs[containerId], gTotalAwbs);
             
             const mFoot = (cat, tClass) => {
-                const c = gTotals[cat]; if (c === 0) return `<td class="py-2 px-1 text-center text-slate-400">-</td>`;
-                return `<td class="py-2 px-1 text-center relative group cursor-pointer"><span class="group-hover:opacity-0 transition-opacity block font-extrabold text-[10px] ${tClass}">${c.toLocaleString('id-ID')}</span>${btnCopyTpl(containerId, cat)}</td>`;
+                const c = gTotals[cat]; if (c === 0) return `<td class="py-3 px-1 text-center text-slate-400">-</td>`;
+                return `<td class="py-3 px-1 text-center relative group cursor-pointer" title="Salin semua ${cat}"><span class="group-hover:opacity-0 transition-opacity block font-extrabold text-[11px] ${tClass}">${c.toLocaleString('id-ID')}</span>${btnCopyTpl(containerId, cat)}</td>`;
             };
             
             let fPct = '-';
-            let fPctVal = 0;
+            let fPctColorClass = "text-slate-400";
+            
             if (hideSafeSla) {
-                if (gTotals["TrueTotal"] > 0) {
-                    fPctVal = (gTotals["Total"] / gTotals["TrueTotal"]) * 100;
+                // Footer Origin Hub: (Total Seluruh Urgent / Grand Total Keseluruhan)
+                if (grandTrueTotal > 0) {
+                    let fPctVal = (gTotals["Total"] / grandTrueTotal) * 100;
                     fPct = fPctVal.toFixed(2).replace('.', ',') + '%';
                 }
+                fPctColorClass = "text-slate-800 font-extrabold";
             } else {
-                if (gTotals["Total"] > 0) {
-                    fPctVal = ((gTotals["Nextday"] + gTotals[">2 Hari"]) / gTotals["Total"]) * 100;
+                // Footer Estimasi & Produk: Total % SLA MAX
+                let fSafeTot = gTotals["Nextday"] + gTotals["TrueMor"];
+                if (gTotals["TrueTotal"] > 0) {
+                    let fPctVal = (fSafeTot / gTotals["TrueTotal"]) * 100;
                     fPct = fPctVal.toFixed(2).replace('.', ',') + '%';
+                    fPctColorClass = fPctVal < 98 ? "text-red-600 font-extrabold" : "text-emerald-600 font-extrabold";
                 }
             }
 
-            let fPctColorClass = "text-purple-700";
-            if (fPct !== '-') {
-                fPctColorClass = fPctVal < 98 ? "text-red-600 font-extrabold" : "text-emerald-600 font-extrabold";
-            }
-
-            html += `</tbody><tfoot class="bg-slate-100 border-t border-slate-200 sticky bottom-0 z-20"><tr>
-                        <td class="py-2 px-2 font-bold text-slate-700 uppercase text-[9px]" colspan="${isMultiCol ? 2 : 1}">Total</td>
+            html += `</tbody><tfoot class="bg-slate-50 border-t-2 border-slate-200 sticky bottom-0 z-20 shadow-inner"><tr>
+                        <td class="py-3 px-3 font-bold text-slate-700 uppercase text-[10px]" colspan="${isMultiCol ? 2 : 1}">Total</td>
                         ${mFoot("After EDD", "text-red-600")}${mFoot("Last Day", "text-orange-600")}${mFoot("Nextday", "text-amber-600")}${hideSafeSla ? '' : mFoot(">2 Hari", "text-emerald-600")}${mFoot("Total", "text-slate-800")}
-                        <td class="py-2 px-2 text-center text-[10px] ${fPctColorClass}">${fPct}</td>
+                        <td class="py-3 px-2 text-center text-[11px] ${fPctColorClass}">${fPct}</td>
                     </tr></tfoot></table></div>`;
             container.innerHTML = html;
         }
