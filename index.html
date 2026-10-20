@@ -1,203 +1,313 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" class="h-full bg-slate-100">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard SLA Staging & Produk</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com/"></script>
+    <title>Dashboard Pantauan SLA & Origin Hub</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script>
         tailwind.config = {
             theme: {
                 extend: {
-                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    fontFamily: { sans: ['Plus Jakarta Sans', 'sans-serif'] },
                     colors: {
-                        brand: { 50: '#eff6ff', 100: '#dbeafe', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8' }
+                        brand: { 50: '#f0f7ff', 100: '#e0effe', 500: '#2563eb', 600: '#1d4ed8', 700: '#1e40af', 900: '#0f172a' }
                     }
                 }
             }
         }
     </script>
     <style>
-        .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar { height: 5px; width: 5px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-        .fade-in { animation: fadeIn 0.3s ease-in-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        .fade-in { animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        .badge-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .6; } }
     </style>
 </head>
-<body class="bg-slate-50 min-h-screen font-sans text-slate-800 pb-12">
-    <!-- Hapus batas max-w, buat edge-to-edge dengan margin tipis -->
-    <div class="w-full px-2 sm:px-4 md:px-6 py-6">
+<body class="bg-slate-100 min-h-screen font-sans text-slate-800 antialiased selection:bg-brand-500 selection:text-white pb-6">
 
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 mb-5 fade-in">
-            <div class="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-                <div class="flex items-center gap-4">
-                    <div class="bg-gradient-to-br from-brand-500 to-indigo-600 p-2.5 rounded-xl shadow-md text-white text-xl font-extrabold flex items-center justify-center w-11 h-11">
-                        📊
-                    </div>
-                    <div>
-                        <h1 class="text-xl font-extrabold text-slate-900 tracking-tight">Dashboard Pantauan SLA & Container</h1>
-                        <p class="text-xs text-slate-500 font-medium mt-0.5">Sistem Pemantauan Performa Hub & Rincian Pengiriman</p>
-                    </div>
+    <!-- Navigation Header -->
+    <header class="bg-slate-900 text-white sticky top-0 z-50 border-b border-slate-800 shadow-md">
+        <div class="w-full px-4 sm:px-6 py-2.5 flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-gradient-to-tr from-brand-600 to-indigo-500 p-2 rounded-xl text-white text-lg shadow-inner flex items-center justify-center w-9 h-9 font-extrabold">
+                    ⚡
                 </div>
-                <div class="flex gap-3 w-full md:w-auto">
-                    <button id="processBtn" class="flex-1 md:flex-none bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2 px-5 text-sm rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2">
-                        <span>▶</span> Proses Data
-                    </button>
-                    <button id="screenshotBtn" class="hidden flex-1 md:flex-none bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-5 text-sm rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2">
-                        <span>📥</span> Unduh Gambar
-                    </button>
+                <div>
+                    <h1 class="text-base font-extrabold tracking-tight text-white flex items-center gap-2">
+                        Dashboard Pantauan SLA Hub
+                        <span class="text-[10px] bg-brand-500/20 text-brand-300 border border-brand-500/30 font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider">Executive Live</span>
+                    </h1>
+                    <p class="text-[11px] text-slate-400 font-medium hidden sm:block">Pemantauan Performa Origin, Staging, Service & Container Distribution</p>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="flex items-center gap-2">
+                <button id="toggleFilterBtn" onclick="toggleFilterPanel()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold py-1.5 px-3 text-xs rounded-lg transition-all flex items-center gap-1.5 shadow-sm">
+                    <span id="toggleFilterIcon">👁️‍🗨️</span> <span id="toggleFilterText">Sembunyikan Filter & FOP</span>
+                </button>
+                <button id="processBtn" class="bg-brand-600 hover:bg-brand-500 text-white font-bold py-1.5 px-4 text-xs rounded-lg transition-all shadow-md hover:shadow-brand-500/20 flex items-center gap-1.5">
+                    <span>▶</span> Proses Data
+                </button>
+                <button id="screenshotBtn" class="hidden bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-1.5 px-4 text-xs rounded-lg transition-all shadow-md flex items-center gap-1.5">
+                    <span>📥</span> Unduh Screenshot
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Notification Toast Container -->
+    <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <main class="w-full px-3 sm:px-5 py-4 space-y-4">
+
+        <!-- Collapsible Controls & Filters Panel -->
+        <div id="filterPanel" class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 fade-in transition-all">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                <!-- SLA CSV Uploader -->
                 <div class="relative group">
                     <input type="file" id="csvFileInput" accept=".csv" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
-                    <div class="flex items-center justify-between px-4 py-3 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50/50 group-hover:border-brand-500 group-hover:bg-brand-50 transition-all">
+                    <div class="flex items-center justify-between px-3.5 py-2.5 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 group-hover:border-brand-500 group-hover:bg-brand-50/50 transition-all">
                         <div class="flex items-center gap-3">
-                            <div class="bg-white p-2 rounded-lg shadow-sm text-brand-600 border border-slate-200 group-hover:border-brand-200 text-lg">📋</div>
+                            <div class="bg-white p-2 rounded-lg shadow-sm text-brand-600 border border-slate-200 group-hover:border-brand-200 text-base">📋</div>
                             <div>
-                                <p class="text-xs font-bold text-slate-700 group-hover:text-brand-700">1. Unggah Data SLA</p>
-                                <p id="slaFileLabel" class="text-[10px] text-slate-500 font-medium mt-0.5">Mendukung format lama & baru (awb, destination_hub, dll)</p>
+                                <p class="text-xs font-bold text-slate-800 group-hover:text-brand-700">1. Unggah Data SLA (CSV)</p>
+                                <p id="slaFileLabel" class="text-[10px] text-slate-500 font-medium">Format: awb, destination_hub, latest_op_code, origin_hub, dll.</p>
                             </div>
                         </div>
-                        <span class="text-[10px] font-bold uppercase tracking-wider bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded-lg group-hover:bg-brand-600 group-hover:text-white group-hover:border-brand-600 transition-colors">Pilih</span>
+                        <span class="text-[10px] font-bold uppercase tracking-wider bg-white border border-slate-200 text-slate-700 px-2.5 py-1 rounded-lg group-hover:bg-brand-600 group-hover:text-white transition-colors">Pilih File</span>
                     </div>
                 </div>
+
+                <!-- Container CSV Uploader -->
                 <div class="relative group">
                     <input type="file" id="csvContainerInput" accept=".csv" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
-                    <div class="flex items-center justify-between px-4 py-3 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50/50 group-hover:border-emerald-500 group-hover:bg-emerald-50 transition-all">
+                    <div class="flex items-center justify-between px-3.5 py-2.5 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 group-hover:border-emerald-500 group-hover:bg-emerald-50/50 transition-all">
                         <div class="flex items-center gap-3">
-                            <div class="bg-white p-2 rounded-lg shadow-sm text-emerald-600 border border-slate-200 group-hover:border-emerald-200 text-lg">📦</div>
+                            <div class="bg-white p-2 rounded-lg shadow-sm text-emerald-600 border border-slate-200 group-hover:border-emerald-200 text-base">📦</div>
                             <div>
-                                <p class="text-xs font-bold text-slate-700 group-hover:text-emerald-700">2. Unggah Data Container</p>
-                                <p id="containerFileLabel" class="text-[10px] text-slate-500 font-medium mt-0.5">Opsional (File CSV)</p>
+                                <p class="text-xs font-bold text-slate-800 group-hover:text-emerald-700">2. Unggah Data Container (CSV)</p>
+                                <p id="containerFileLabel" class="text-[10px] text-slate-500 font-medium">Opsional: container_no, awb, zone_code</p>
                             </div>
                         </div>
-                        <span class="text-[10px] font-bold uppercase tracking-wider bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded-lg group-hover:bg-emerald-600 group-hover:text-white group-hover:border-emerald-600 transition-colors">Pilih</span>
+                        <span class="text-[10px] font-bold uppercase tracking-wider bg-white border border-slate-200 text-slate-700 px-2.5 py-1 rounded-lg group-hover:bg-emerald-600 group-hover:text-white transition-colors">Pilih File</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filter Categories Grid -->
+            <div class="pt-3 border-t border-slate-100 space-y-3 text-xs">
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Area Hub Tujuan</label>
+                    <div class="flex flex-wrap gap-1.5">
+                        <label class="cursor-pointer"><input type="checkbox" value="MKS" class="peer hidden hub-filter" checked><div class="px-2.5 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-slate-900 peer-checked:text-white peer-checked:border-slate-900 transition-all">MKS</div></label>
+                        <label class="cursor-pointer"><input type="checkbox" value="BPP" class="peer hidden hub-filter" checked><div class="px-2.5 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-slate-900 peer-checked:text-white peer-checked:border-slate-900 transition-all">BPP</div></label>
+                        <label class="cursor-pointer"><input type="checkbox" value="BJM" class="peer hidden hub-filter" checked><div class="px-2.5 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-slate-900 peer-checked:text-white peer-checked:border-slate-900 transition-all">BJM</div></label>
+                        <label class="cursor-pointer"><input type="checkbox" value="PLK" class="peer hidden hub-filter" checked><div class="px-2.5 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-slate-900 peer-checked:text-white peer-checked:border-slate-900 transition-all">PLK</div></label>
+                        <label class="cursor-pointer"><input type="checkbox" value="MND" class="peer hidden hub-filter" checked><div class="px-2.5 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-slate-900 peer-checked:text-white peer-checked:border-slate-900 transition-all">MND</div></label>
+                        <label class="cursor-pointer"><input type="checkbox" value="PAL" class="peer hidden hub-filter" checked><div class="px-2.5 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-slate-900 peer-checked:text-white peer-checked:border-slate-900 transition-all">PAL</div></label>
+                        <label class="cursor-pointer"><input type="checkbox" value="KDI" class="peer hidden hub-filter" checked><div class="px-2.5 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-slate-900 peer-checked:text-white peer-checked:border-slate-900 transition-all">KDI</div></label>
+                        <label class="cursor-pointer"><input type="checkbox" value="TAR" class="peer hidden hub-filter" checked><div class="px-2.5 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-slate-900 peer-checked:text-white peer-checked:border-slate-900 transition-all">TAR</div></label>
+                        <label class="cursor-pointer"><input type="checkbox" value="Gateway" class="peer hidden hub-filter" checked><div class="px-2.5 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-slate-900 peer-checked:text-white peer-checked:border-slate-900 transition-all">Gateway</div></label>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Batas Waktu Pengiriman (EDD)</label>
+                    <div class="flex flex-wrap gap-1.5">
+                        <label class="cursor-pointer"><input type="checkbox" value="<0" class="peer hidden edd-filter" checked><div class="px-2.5 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-red-600 peer-checked:text-white peer-checked:border-red-600 transition-all">Lewat SLA (&lt;0)</div></label>
+                        <label class="cursor-pointer"><input type="checkbox" value="0" class="peer hidden edd-filter" checked><div class="px-2.5 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600 transition-all">H+0</div></label>
+                        <label class="cursor-pointer"><input type="checkbox" value="1" class="peer hidden edd-filter" checked><div class="px-2.5 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600 transition-all">H+1</div></label>
+                        <label class="cursor-pointer"><input type="checkbox" value="2" class="peer hidden edd-filter" checked><div class="px-2.5 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600 transition-all">H+2</div></label>
+                        <label class="cursor-pointer"><input type="checkbox" value="3" class="peer hidden edd-filter" checked><div class="px-2.5 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600 transition-all">H+3</div></label>
+                        <label class="cursor-pointer"><input type="checkbox" value="4" class="peer hidden edd-filter" checked><div class="px-2.5 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600 transition-all">H+4</div></label>
+                        <label class="cursor-pointer"><input type="checkbox" value=">4" class="peer hidden edd-filter" checked><div class="px-2.5 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600 transition-all">&gt;H+4</div></label>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">FOP Filter</label>
+                        <div id="fopFilterContainer" class="flex flex-wrap gap-1 max-h-20 overflow-y-auto custom-scrollbar p-1 bg-slate-50 rounded-lg border border-slate-200">
+                            <span class="text-[10px] text-slate-400 p-1">Unggah file SLA...</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Staging Filter</label>
+                        <div id="stagingFilterContainer" class="flex flex-wrap gap-1 max-h-20 overflow-y-auto custom-scrollbar p-1 bg-slate-50 rounded-lg border border-slate-200">
+                            <span class="text-[10px] text-slate-400 p-1">Unggah file SLA...</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Service / Produk Filter</label>
+                        <div id="produkFilterContainer" class="flex flex-wrap gap-1 max-h-20 overflow-y-auto custom-scrollbar p-1 bg-slate-50 rounded-lg border border-slate-200">
+                            <span class="text-[10px] text-slate-400 p-1">Unggah file SLA...</span>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 mb-6 fade-in">
-            <h2 class="text-xs font-bold text-slate-900 mb-4 flex items-center gap-2">
-                <span class="text-slate-400">⚙️</span> Panel Filter Data
-            </h2>
+        <!-- Loading State -->
+        <div id="loadingIndicator" class="hidden flex-col items-center justify-center py-16 bg-white rounded-xl border border-slate-200 shadow-sm">
+            <div class="animate-spin rounded-full h-10 w-10 border-4 border-brand-600 border-t-transparent mb-3"></div>
+            <p class="text-slate-800 font-extrabold text-sm">Mengolah Data & Kalkulasi SLA...</p>
+            <p class="text-slate-400 text-xs mt-0.5">Menyusun statistik dan pemetaan tabel secara otomatis</p>
+        </div>
 
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Area Hub Tujuan</label>
-                    <div class="flex flex-wrap gap-2">
-                        <label class="cursor-pointer group"><input type="checkbox" value="MKS" class="peer hidden hub-filter" checked><div class="px-3 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-slate-800 peer-checked:text-white peer-checked:border-slate-800">MKS</div></label>
-                        <label class="cursor-pointer group"><input type="checkbox" value="BPP" class="peer hidden hub-filter" checked><div class="px-3 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-slate-800 peer-checked:text-white peer-checked:border-slate-800">BPP</div></label>
-                        <label class="cursor-pointer group"><input type="checkbox" value="BJM" class="peer hidden hub-filter" checked><div class="px-3 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-slate-800 peer-checked:text-white peer-checked:border-slate-800">BJM</div></label>
-                        <label class="cursor-pointer group"><input type="checkbox" value="PLK" class="peer hidden hub-filter" checked><div class="px-3 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-slate-800 peer-checked:text-white peer-checked:border-slate-800">PLK</div></label>
-                        <label class="cursor-pointer group"><input type="checkbox" value="MND" class="peer hidden hub-filter" checked><div class="px-3 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-slate-800 peer-checked:text-white peer-checked:border-slate-800">MND</div></label>
-                        <label class="cursor-pointer group"><input type="checkbox" value="PAL" class="peer hidden hub-filter" checked><div class="px-3 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-slate-800 peer-checked:text-white peer-checked:border-slate-800">PAL</div></label>
-                        <label class="cursor-pointer group"><input type="checkbox" value="KDI" class="peer hidden hub-filter" checked><div class="px-3 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-slate-800 peer-checked:text-white peer-checked:border-slate-800">KDI</div></label>
-                        <label class="cursor-pointer group"><input type="checkbox" value="TAR" class="peer hidden hub-filter" checked><div class="px-3 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-slate-800 peer-checked:text-white peer-checked:border-slate-800">TAR</div></label>
-                        <label class="cursor-pointer group"><input type="checkbox" value="Gateway" class="peer hidden hub-filter" checked><div class="px-3 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-slate-800 peer-checked:text-white peer-checked:border-slate-800">Gateway</div></label>
+        <!-- Main Dashboard View Canvas -->
+        <div id="dashboardContent" class="hidden fade-in space-y-3">
+
+            <!-- Executive KPI Summary Bar -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div class="bg-white rounded-xl p-3.5 border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Inbound AWB</p>
+                        <h3 id="kpiTotalAwb" class="text-xl font-extrabold text-slate-900 mt-0.5">0</h3>
+                        <p class="text-[10px] text-slate-500 mt-0.5 font-medium">Data terproses dalam filter</p>
                     </div>
+                    <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center text-lg font-bold">📦</div>
                 </div>
-                <div>
-                    <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Batas Waktu Pengiriman (EDD)</label>
-                    <div class="flex flex-wrap gap-2">
-                        <label class="cursor-pointer group"><input type="checkbox" value="<0" class="peer hidden edd-filter" checked><div class="px-3 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-red-600 peer-checked:text-white peer-checked:border-red-600">Lewat SLA</div></label>
-                        <label class="cursor-pointer group"><input type="checkbox" value="0" class="peer hidden edd-filter" checked><div class="px-3 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600">H+0</div></label>
-                        <label class="cursor-pointer group"><input type="checkbox" value="1" class="peer hidden edd-filter" checked><div class="px-3 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600">H+1</div></label>
-                        <label class="cursor-pointer group"><input type="checkbox" value="2" class="peer hidden edd-filter" checked><div class="px-3 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600">H+2</div></label>
-                        <label class="cursor-pointer group"><input type="checkbox" value="3" class="peer hidden edd-filter" checked><div class="px-3 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600">H+3</div></label>
-                        <label class="cursor-pointer group"><input type="checkbox" value="4" class="peer hidden edd-filter" checked><div class="px-3 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600">H+4</div></label>
-                        <label class="cursor-pointer group"><input type="checkbox" value=">4" class="peer hidden edd-filter" checked><div class="px-3 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[11px] peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600">&gt;H+4</div></label>
+
+                <div class="bg-white rounded-xl p-3.5 border border-red-200 bg-gradient-to-br from-red-50/50 to-white shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-[10px] font-bold uppercase tracking-wider text-red-500">Resi Lewat SLA (After EDD)</p>
+                        <h3 id="kpiAfterEdd" class="text-xl font-extrabold text-red-600 mt-0.5">0</h3>
+                        <p class="text-[10px] text-red-500/80 mt-0.5 font-medium">Perlu tindakan darurat</p>
                     </div>
+                    <div class="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center text-lg font-bold badge-pulse">🚨</div>
                 </div>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+                <div class="bg-white rounded-xl p-3.5 border border-amber-200 bg-gradient-to-br from-amber-50/50 to-white shadow-sm flex items-center justify-between">
                     <div>
-                        <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">FOP (Latest Op Code)</label>
-                        <div id="fopFilterContainer" class="flex flex-wrap gap-2 max-h-24 overflow-y-auto custom-scrollbar p-1"><div class="text-[10px] text-slate-400">Pilih file SLA dulu...</div></div>
+                        <p class="text-[10px] font-bold uppercase tracking-wider text-amber-600">Last Day + Nextday</p>
+                        <h3 id="kpiUrgent" class="text-xl font-extrabold text-amber-600 mt-0.5">0</h3>
+                        <p class="text-[10px] text-amber-600/80 mt-0.5 font-medium">Batas pengiriman hari ini & H+1</p>
                     </div>
+                    <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center text-lg font-bold">⏳</div>
+                </div>
+
+                <div class="bg-white rounded-xl p-3.5 border border-slate-200 shadow-sm flex items-center justify-between">
                     <div>
-                        <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Staging Destinasi</label>
-                        <div id="stagingFilterContainer" class="flex flex-wrap gap-2 max-h-24 overflow-y-auto custom-scrollbar p-1"><div class="text-[10px] text-slate-400">Pilih file SLA dulu...</div></div>
+                        <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Pencapaian SLA MAX</p>
+                        <h3 id="kpiSlaMax" class="text-xl font-extrabold text-slate-900 mt-0.5">0,00%</h3>
+                        <p id="kpiSlaStatus" class="text-[10px] font-semibold text-slate-500 mt-0.5">Status Performa System</p>
                     </div>
-                    <div>
-                        <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Service / Produk</label>
-                        <div id="produkFilterContainer" class="flex flex-wrap gap-2 max-h-24 overflow-y-auto custom-scrollbar p-1"><div class="text-[10px] text-slate-400">Pilih file SLA dulu...</div></div>
-                    </div>
+                    <div id="kpiSlaBadge" class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-lg font-bold">🎯</div>
                 </div>
             </div>
-        </div>
 
-        <div id="loadingIndicator" class="hidden flex-col items-center justify-center py-12">
-            <div class="animate-spin rounded-full h-10 w-10 border-4 border-brand-500 border-t-transparent mb-4"></div>
-            <p class="text-slate-600 font-bold text-sm">Memproses Data...</p>
-        </div>
+            <!-- Top Section: FOP Matrix Summary Table (Hides when filter panel is toggled off) -->
+            <div id="fopMatrixSection" class="transition-all">
+                <div id="tableFopContainer" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"></div>
+            </div>
 
-        <div id="dashboardContent" class="hidden fade-in space-y-4">
-            
-            <div id="tableFopContainer" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"></div>
-            
-            <!-- Grid 12 kolom untuk 3 bagian tabel sejajar -->
+            <!-- Main Grid View (12 Columns for Consolidated Single Screen View) -->
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
                 
-                <!-- Kolom 1 (Kiri): Estimasi Staging & Panduan (Porsi 33%) -->
+                <!-- Column 1 (Left 33%): Estimasi Inbound & Reading Guide -->
                 <div class="lg:col-span-4 flex flex-col gap-3">
                     <div id="tableStagingContainer" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"></div>
                     
-                    <div class="bg-indigo-50/50 rounded-xl border border-indigo-100 p-3">
-                        <h3 class="font-bold text-indigo-900 mb-2 text-xs flex items-center gap-2">
-                            <span>ℹ️</span> Panduan Membaca Tabel
+                    <!-- Panduan SLA Card -->
+                    <div class="bg-indigo-50/60 rounded-xl border border-indigo-100 p-3 text-slate-700">
+                        <h3 class="font-bold text-indigo-950 mb-1.5 text-xs flex items-center gap-1.5">
+                            <span>ℹ️</span> Panduan Definisi SLA
                         </h3>
-                        <div class="grid grid-cols-2 gap-y-1 gap-x-2 text-[10px]">
-                            <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-slate-400"></div><span class="text-slate-700"><b>Estimasi:</b> Diproses Tgl tsb</span></div>
-                            <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-red-600"></div><span class="text-slate-700"><b>After EDD:</b> Lewat SLA</span></div>
-                            <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-orange-500"></div><span class="text-slate-700"><b>Last Day:</b> Batas maksimal hari ini</span></div>
-                            <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-amber-400"></div><span class="text-slate-700"><b>Nextday:</b> Sisa waktu 1 hari</span></div>
-                            <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-emerald-500"></div><span class="text-slate-700"><b>&gt;2 Day:</b> Sisa 2 hari atau lebih</span></div>
-                            <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-purple-600"></div><span class="text-slate-700"><b>SLA MAX:</b> % Nextday ke atas</span></div>
+                        <div class="grid grid-cols-2 gap-y-1.5 gap-x-2 text-[10px]">
+                            <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-slate-400"></div><span><b>Estimasi:</b> Diproses tgl tsb</span></div>
+                            <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-red-600"></div><span><b>After EDD:</b> Melewati SLA</span></div>
+                            <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-orange-500"></div><span><b>Last Day:</b> Batas hari ini</span></div>
+                            <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-amber-400"></div><span><b>Nextday:</b> Sisa 1 hari</span></div>
+                            <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-emerald-500"></div><span><b>&gt;2 Day:</b> Sisa &ge;2 hari</span></div>
+                            <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-purple-600"></div><span><b>SLA MAX:</b> % Nextday ke atas</span></div>
                         </div>
-                        <p class="text-[9px] text-indigo-500/80 font-medium mt-2 italic">*) Paket dengan resi Return (awb 5100xxx) dikecualikan</p>
                     </div>
                 </div>
 
-                <!-- Kolom 2 (Tengah): Service & Origin Hub (Porsi 25%) -->
-                <div class="lg:col-span-3 flex flex-col gap-3">
+                <!-- Column 2 (Middle 33%): Service & Origin Hub Darurat -->
+                <div class="lg:col-span-4 flex flex-col gap-3">
                     <div id="tableProdukContainer" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"></div>
                     <div id="tableOriginHubContainer" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"></div>
                 </div>
 
-                <!-- Kolom 3 (Kanan): Data Container (Porsi terlebar 42%) -->
-                <div class="lg:col-span-5">
+                <!-- Column 3 (Right 34%): Data Container -->
+                <div class="lg:col-span-4">
                     <div id="tableContainerSameday" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"></div>
                 </div>
+
             </div>
         </div>
-    </div>
+    </main>
 
     <script>
+        // Global States
         let globalSlaData = [];
         let globalContainerData = [];
         let globalRefDate = new Date();
         window.tableAwbs = {};
+        window.exportMap = {};
 
+        // UI Toast Notification Helper
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            const bgClass = type === 'success' ? 'bg-slate-900 text-white border-slate-800' : 'bg-red-600 text-white border-red-500';
+            toast.className = `pointer-events-auto flex items-center gap-2 px-3.5 py-2 rounded-lg border shadow-lg text-xs font-semibold transition-all duration-300 transform translate-y-2 opacity-0 ${bgClass}`;
+            toast.innerHTML = `<span>${type === 'success' ? '✓' : '⚠️'}</span> <span>${message}</span>`;
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 2500);
+        }
+
+        // Toggle Filter Panel & FOP Matrix Simultaneously for Max Clean Workspace
+        function toggleFilterPanel() {
+            const panel = document.getElementById('filterPanel');
+            const fopSection = document.getElementById('fopMatrixSection');
+            const btnText = document.getElementById('toggleFilterText');
+            const btnIcon = document.getElementById('toggleFilterIcon');
+
+            if (panel.classList.contains('hidden')) {
+                panel.classList.remove('hidden');
+                if (fopSection) fopSection.classList.remove('hidden');
+                btnText.innerText = 'Sembunyikan Filter & FOP';
+                btnIcon.innerText = '👁️‍🗨️';
+            } else {
+                panel.classList.add('hidden');
+                if (fopSection) fopSection.classList.add('hidden');
+                btnText.innerText = 'Tampilkan Filter & FOP';
+                btnIcon.innerText = '⚙️';
+            }
+        }
+
+        // File Uploader Labels
         document.getElementById('csvFileInput').addEventListener('change', function(e) {
             const count = e.target.files.length;
-            document.getElementById('slaFileLabel').innerText = count > 0 ? `${count} file CSV terpilih` : 'Mendukung format lama & baru';
+            document.getElementById('slaFileLabel').innerText = count > 0 ? `${count} file CSV SLA terpilih` : 'Format: awb, destination_hub, latest_op_code, origin_hub, dll.';
             document.getElementById('slaFileLabel').classList.toggle('text-brand-600', count > 0);
         });
+        
         document.getElementById('csvContainerInput').addEventListener('change', function(e) {
             const count = e.target.files.length;
-            document.getElementById('containerFileLabel').innerText = count > 0 ? `${count} file CSV terpilih` : 'Opsional (File CSV)';
+            document.getElementById('containerFileLabel').innerText = count > 0 ? `${count} file CSV Container terpilih` : 'Opsional: container_no, awb, zone_code';
             document.getElementById('containerFileLabel').classList.toggle('text-emerald-600', count > 0);
         });
 
-        const btnCopyTpl = (contId, key) => `<button onclick="copyAwbs('${contId}', '${key}', this)" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 bg-slate-800 text-white border border-slate-700 px-2 py-1 rounded shadow-xl z-30 font-semibold text-[9px] uppercase tracking-wide flex items-center transition-all transform scale-90 group-hover:scale-100">Salin</button>`;
-
+        // Copy Clipboard Helpers
         window.copyToClipboard = function(text, btnElement) {
             const actualText = text.replace(/\\\n/g, '\n');
             const textarea = document.createElement('textarea');
@@ -206,37 +316,25 @@
             textarea.select();
             try {
                 document.execCommand('copy');
-                const originalHTML = btnElement.innerHTML;
-                const isSalinSemua = originalHTML.includes('Salin');
-
-                if(isSalinSemua) {
+                showToast('Data berhasil disalin ke clipboard!');
+                if (btnElement) {
+                    const originalText = btnElement.innerHTML;
                     btnElement.innerHTML = '✓ Tersalin!';
-                    btnElement.classList.add('bg-emerald-600', 'text-white', 'border-emerald-600');
-                    btnElement.classList.remove('bg-white', 'text-slate-600');
-                } else {
-                    btnElement.innerHTML = '✓';
-                    btnElement.classList.add('bg-emerald-500', 'text-white', 'border-emerald-500');
+                    setTimeout(() => { btnElement.innerHTML = originalText; }, 1500);
                 }
-                setTimeout(() => {
-                    btnElement.innerHTML = originalHTML;
-                    if(isSalinSemua) {
-                        btnElement.classList.remove('bg-emerald-600', 'text-white', 'border-emerald-600');
-                        btnElement.classList.add('bg-white', 'text-slate-600');
-                    } else {
-                        btnElement.classList.remove('bg-emerald-500', 'text-white', 'border-emerald-500');
-                    }
-                }, 1500);
             } catch (err) {
-                console.error('Gagal menyalin', err);
+                showToast('Gagal menyalin data', 'error');
             }
             document.body.removeChild(textarea);
         };
 
         window.copyAwbs = function(containerId, category, btnElement) {
             const awbs = window.tableAwbs[containerId]?.[category] || [];
-            if (awbs.length === 0) return;
-            const text = awbs.join('\n');
-            window.copyToClipboard(text, btnElement);
+            if (awbs.length === 0) {
+                showToast('Tidak ada resi AWB untuk disalin.', 'error');
+                return;
+            }
+            window.copyToClipboard(awbs.join('\n'), btnElement);
         };
 
         window.copyTableTsv = function(containerId, btnElement) {
@@ -263,6 +361,7 @@
 
         window.downloadSlaExcel = function(hideSafe = false) {
             let csvContent = "Origin Hub,Service,Status,Staging,AWB\n";
+            let count = 0;
             for (let key in window.exportMap) {
                 let parts = key.split('|');
                 let origin = parts[0];
@@ -271,22 +370,28 @@
                 let staging = parts[3] || 'TANPA STAGING';
                 let awbs = window.exportMap[key];
                 
-                // Jika unduh dari tabel Origin Hub (hideSafe = true), abaikan resi yang aman (>2 Hari)
                 if (hideSafe && status === ">2 Hari") continue;
                 
-                // Tiap AWB di baris terpisah
                 awbs.forEach(awb => {
                     csvContent += `"${origin}","${service}","${status}","${staging}","${awb}"\n`;
+                    count++;
                 });
             }
+
+            if (count === 0) {
+                showToast('Tidak ada data resi untuk diunduh', 'error');
+                return;
+            }
+
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
             link.setAttribute("href", url);
-            link.setAttribute("download", `Data_SLA_Origin_${new Date().toISOString().slice(0,10)}.csv`);
+            link.setAttribute("download", `Export_SLA_Origin_${new Date().toISOString().slice(0,10)}.csv`);
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+            showToast(`Berhasil mengunduh ${count.toLocaleString('id-ID')} resi AWB!`);
         };
 
         const setupFilterListeners = () => {
@@ -296,6 +401,7 @@
         };
         setupFilterListeners();
 
+        // CSV Parser via PapaParse
         function parseCSV(file) {
             return new Promise((resolve) => {
                 Papa.parse(file, {
@@ -306,6 +412,7 @@
             });
         }
 
+        // Data Row Normalization for Robust Header Reading
         function normalizeSlaRow(row) {
             const clean = {};
             for (let k in row) {
@@ -323,6 +430,7 @@
                 origin_hub: clean['origin_hub'] || clean['originhub'] || 'KOSONG'
             };
         }
+
         function normalizeContainerRow(row) {
             const clean = {};
             for (let k in row) {
@@ -337,10 +445,14 @@
             };
         }
 
+        // Action: Process Data
         document.getElementById('processBtn').addEventListener('click', () => {
             const slaInput = document.getElementById('csvFileInput');
             const containerInput = document.getElementById('csvContainerInput');
-            if (!slaInput.files.length) { alert('Silakan pilih file CSV SLA terlebih dahulu.'); return; }
+            if (!slaInput.files.length) {
+                showToast('Silakan pilih file CSV SLA terlebih dahulu!', 'error');
+                return;
+            }
 
             const today = new Date();
             globalRefDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -363,7 +475,7 @@
                     if (list.length > 0) {
                         c.innerHTML = '';
                         list.forEach(item => {
-                            c.innerHTML += `<label class="cursor-pointer group"><input type="checkbox" value="${item}" class="peer hidden ${classNm}" checked><div class="px-2 py-0.5 rounded border border-slate-200 bg-slate-50 text-slate-600 font-semibold text-[10px] peer-checked:bg-indigo-600 peer-checked:text-white peer-checked:border-indigo-600">${item}</div></label>`;
+                            c.innerHTML += `<label class="cursor-pointer"><input type="checkbox" value="${item}" class="peer hidden ${classNm}" checked><div class="px-2 py-0.5 rounded border border-slate-200 bg-white text-slate-600 font-medium text-[10px] peer-checked:bg-brand-600 peer-checked:text-white peer-checked:border-brand-600 transition-all">${item}</div></label>`;
                         });
                     }
                 };
@@ -383,6 +495,7 @@
             document.getElementById('dashboardContent').classList.add('hidden');
             setTimeout(() => { processData(globalSlaData, globalContainerData, globalRefDate); }, 50);
         }
+
         function getHubGroup(prefix) {
             const p = prefix ? prefix.toUpperCase() : "";
             if (["MKS", "BPP", "BJM", "PLK", "MND", "PAL", "KDI", "TAR"].includes(p)) return p;
@@ -401,6 +514,11 @@
             const stagingData = {}; const produkData = {}; const fopMatrixData = {}; const originHubData = {};
             const awbTargetMap = new Map();
 
+            let kpiTotalCount = 0;
+            let kpiAfterEddCount = 0;
+            let kpiUrgentCount = 0;
+            let kpiSafeCount = 0;
+
             slaData.forEach(rawRow => {
                 const row = normalizeSlaRow(rawRow);
                 if (!row.awb || !row.edd || row.awb.startsWith('5100')) return;
@@ -416,7 +534,6 @@
                 if (isNaN(edd)) return;
 
                 const diffDays = Math.round((edd - refDate) / (1000 * 60 * 60 * 24));
-                // Perubahan "Nextday" (1) & ">2 Hari" (>=2)
                 const category = diffDays < 0 ? "After EDD" : diffDays === 0 ? "Last Day" : diffDays === 1 ? "Nextday" : ">2 Hari";
                 const eddCategory = diffDays < 0 ? "<0" : diffDays <= 4 ? diffDays.toString() : ">4";
                 
@@ -426,6 +543,11 @@
                     awbTargetMap.set(row.awb, eddCategory);
                     
                     if (selectedEdds.includes(eddCategory)) {
+                        kpiTotalCount++;
+                        if (category === "After EDD") kpiAfterEddCount++;
+                        else if (category === "Last Day" || category === "Nextday") kpiUrgentCount++;
+                        else kpiSafeCount++;
+
                         const compKey = `${destHub}::${destHub === "Gateway" ? "Gateway" : (row.staging || `${destHub} (Tanpa Staging)`)}`;
                         if (!stagingData[compKey]) stagingData[compKey] = {};
                         if (!stagingData[compKey][category]) stagingData[compKey][category] = [];
@@ -455,6 +577,7 @@
                 }
             });
 
+            // Container Mapping
             const containerAbsoluteMap = {};
             containerData.forEach(r => {
                 const row = normalizeContainerRow(r);
@@ -475,15 +598,16 @@
                 }
             });
 
+            // SLA Origin Hub Aggregation (Top 10 + Grouped 'Lainnya')
             let ohStats = Object.keys(originHubData).map(hub => {
                 let aft = (originHubData[hub]['After EDD'] || []);
                 let lst = (originHubData[hub]['Last Day'] || []);
                 let nxt = (originHubData[hub]['Nextday'] || []);
                 let mor = (originHubData[hub]['>2 Hari'] || []);
-                let urgentCnt = aft.length + lst.length + nxt.length; // Hanya After EDD, Last Day, Nextday
+                let urgentCnt = aft.length + lst.length + nxt.length;
                 let trueTot = urgentCnt + mor.length;
                 return { hub, urgentCnt, trueTot, aft, lst, nxt, mor };
-            }).filter(item => item.urgentCnt > 0) // Eksekusi: Hapus/sembunyikan jika tidak ada resi urgent
+            }).filter(item => item.urgentCnt > 0)
               .sort((a, b) => b.urgentCnt - a.urgentCnt);
 
             let finalOriginHubData = {};
@@ -491,7 +615,7 @@
             let lainnyaTrueTot = 0;
 
             ohStats.forEach((item, index) => {
-                if (index < 15) {
+                if (index < 10) {
                     finalOriginHubData[item.hub] = {
                         'After EDD': item.aft,
                         'Last Day': item.lst,
@@ -518,12 +642,34 @@
                 };
             }
 
+            // Update Executive KPI Dashboard Bar
+            document.getElementById('kpiTotalAwb').innerText = kpiTotalCount.toLocaleString('id-ID');
+            document.getElementById('kpiAfterEdd').innerText = kpiAfterEddCount.toLocaleString('id-ID');
+            document.getElementById('kpiUrgent').innerText = kpiUrgentCount.toLocaleString('id-ID');
+            
+            const slaMaxPct = kpiTotalCount > 0 ? (((kpiUrgentCount + kpiSafeCount) / kpiTotalCount) * 100) : 0;
+            const slaFormatted = slaMaxPct.toFixed(2).replace('.', ',') + '%';
+            document.getElementById('kpiSlaMax').innerText = slaFormatted;
+            
+            const kpiBadge = document.getElementById('kpiSlaBadge');
+            const kpiStatus = document.getElementById('kpiSlaStatus');
+            if (slaMaxPct >= 98) {
+                kpiBadge.className = "w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-lg font-bold";
+                kpiStatus.className = "text-[10px] font-semibold text-emerald-600 mt-0.5";
+                kpiStatus.innerText = "✓ Target SLA Terpenuhi (≥98%)";
+            } else {
+                kpiBadge.className = "w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center text-lg font-bold badge-pulse";
+                kpiStatus.className = "text-[10px] font-semibold text-red-600 mt-0.5";
+                kpiStatus.innerText = "⚠️ Di Bawah Target (<98%)";
+            }
+
+            // Render Tables
             const dateStr = refDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
             renderTable('tableStagingContainer', stagingData, 'Estimasi Inbound Tgl ' + dateStr, 'Tujuan,Staging Destinasi', false, false);
             renderTable('tableProdukContainer', produkData, 'Service', 'Produk', true, false);
             renderTable('tableOriginHubContainer', finalOriginHubData, 'Data SLA Origin Hub (Darurat)', 'Origin Hub', true, true);
             renderContainerTable('tableContainerSameday', containerTargetMap, 'Data Container Berdasarkan Filter');
-            renderFopMatrixTable('tableFopContainer', fopMatrixData, 'Sebaran FOP Berdasarkan Tujuan', selectedFops);
+            renderFopMatrixTable('tableFopContainer', fopMatrixData, 'Sebaran FOP Berdasarkan Hub Tujuan', selectedFops);
 
             document.getElementById('loadingIndicator').classList.add('hidden');
             document.getElementById('loadingIndicator').classList.remove('flex');
@@ -531,42 +677,45 @@
             document.getElementById('screenshotBtn').classList.remove('hidden');
         }
 
+        const btnCopyTpl = (contId, key) => `<button onclick="copyAwbs('${contId}', '${key}', this)" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 bg-slate-900 text-white border border-slate-700 px-2 py-0.5 rounded shadow-xl z-30 font-semibold text-[9px] uppercase tracking-wide flex items-center transition-all transform scale-90 group-hover:scale-100">Salin</button>`;
+
         function renderTable(containerId, dataObj, title, rowLabel, showDownload = false, hideSafeSla = false) {
             const container = document.getElementById(containerId);
             const isMultiCol = rowLabel.includes(',');
             const labels = isMultiCol ? rowLabel.split(',') : [rowLabel];
             window.tableAwbs[containerId] = {};
-            let thLabels = labels.map(lbl => `<th class="py-2.5 px-3 font-bold tracking-wider">${lbl}</th>`).join('');
+            let thLabels = labels.map(lbl => `<th class="py-2 px-3 font-bold tracking-wider">${lbl}</th>`).join('');
 
             let actionBtn = '';
             if (showDownload) {
                 if (hideSafeSla) {
-                    actionBtn = `<button onclick="downloadSlaExcel(${hideSafeSla})" class="text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded shadow-sm transition-all flex items-center gap-1.5"><span>📥</span> Unduh Excel</button>`;
+                    actionBtn = `<button onclick="downloadSlaExcel(true)" class="text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2.5 py-1 rounded-lg shadow-sm transition-all flex items-center gap-1"><span>📥</span> Unduh Excel</button>`;
                 } else {
-                    actionBtn = `<button onclick="copyTableTsv('${containerId}', this)" class="text-[10px] bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-1.5 rounded shadow-sm transition-all flex items-center gap-1.5"><span>📋</span> Salin Data</button>`;
+                    actionBtn = `<button onclick="copyTableTsv('${containerId}', this)" class="text-[10px] bg-brand-600 hover:bg-brand-700 text-white font-bold px-2.5 py-1 rounded-lg shadow-sm transition-all flex items-center gap-1"><span>📋</span> Salin Data</button>`;
                 }
             }
 
             let html = `
-                <div class="p-4 border-b border-slate-200 bg-white flex items-center justify-between sticky top-0 z-30">
-                    <h2 class="text-sm font-extrabold text-slate-800">${title}</h2>
+                <div class="p-3 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between sticky top-0 z-30">
+                    <h2 class="text-xs font-extrabold text-slate-800">${title}</h2>
                     ${actionBtn}
                 </div>
-                <div class="max-h-full overflow-y-auto overflow-x-auto custom-scrollbar">
+                <div class="overflow-x-auto custom-scrollbar">
                     <table class="w-full text-left text-[11px] text-slate-600 relative">
-                        <thead class="bg-slate-50/95 backdrop-blur-sm text-[10px] text-slate-500 uppercase border-b border-slate-200 sticky top-0 z-20 shadow-sm">
+                        <thead class="bg-slate-100/90 backdrop-blur-sm text-[10px] text-slate-500 uppercase border-b border-slate-200 sticky top-0 z-20 shadow-sm">
                             <tr>
                                 ${thLabels}
-                                <th class="py-2.5 px-2 text-center font-bold tracking-wider text-red-500">After EDD</th>
-                                <th class="py-2.5 px-2 text-center font-bold tracking-wider text-orange-500">Last Day</th>
-                                <th class="py-2.5 px-2 text-center font-bold tracking-wider text-amber-500">Nextday</th>
-                                ${hideSafeSla ? '' : '<th class="py-2.5 px-2 text-center font-bold tracking-wider text-emerald-500">&gt;2 Day</th>'}
-                                <th class="py-2.5 px-2 text-center font-bold tracking-wider text-slate-700">Total</th>
-                                <th class="py-2.5 px-2 text-center font-bold tracking-wider text-purple-600">${hideSafeSla ? '% DARI TOTAL' : '% SLA MAX'}</th>
+                                <th class="py-2 px-2 text-center font-bold tracking-wider text-red-600">After EDD</th>
+                                <th class="py-2 px-2 text-center font-bold tracking-wider text-orange-600">Last Day</th>
+                                <th class="py-2 px-2 text-center font-bold tracking-wider text-amber-600">Nextday</th>
+                                ${hideSafeSla ? '' : '<th class="py-2 px-2 text-center font-bold tracking-wider text-emerald-600">&gt;2 Day</th>'}
+                                <th class="py-2 px-2 text-center font-bold tracking-wider text-slate-800">Total</th>
+                                <th class="py-2 px-2 text-center font-bold tracking-wider text-purple-700">${hideSafeSla ? '% DARI TOTAL' : '% SLA MAX'}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
             `;
+
             let gTotals = { "After EDD": 0, "Last Day": 0, "Nextday": 0, ">2 Hari": 0, "Total": 0, "TrueTotal": 0, "TrueMor": 0 };
             let gTotalAwbs = { "After EDD": [], "Last Day": [], "Nextday": [], ">2 Hari": [], "Total": [] };
 
@@ -577,10 +726,9 @@
                 
                 const trueMor = mor;
                 const trueTot = r.TrueTotal || (aft.length + lst.length + nxt.length + mor.length);
-                grandTrueTotal += trueTot; // Hitung Global Total AWB untuk semua origin (cth: 5461)
+                grandTrueTotal += trueTot;
                 
                 const tot = hideSafeSla ? aft.concat(lst, nxt) : aft.concat(lst, nxt, mor);
-                
                 const p = isMultiCol ? key.split('::') : [key];
                 return { key, p0: p[0], p1: p[1]||'', a: aft, l: lst, n: nxt, m: hideSafeSla ? [] : mor, t: tot, trueTot: trueTot, trueMor: trueMor };
             });
@@ -598,13 +746,14 @@
             if (isMultiCol) rowData.forEach(r => rowSpans[r.p0] = (rowSpans[r.p0] || 0) + 1);
             
             const mCell = (k, count, cTheme) => {
-                if (count === 0) return `<td class="py-2 px-1 text-center"><span class="text-slate-300 font-medium">-</span></td>`;
-                const tc = {r:'bg-red-50 text-red-600 group-hover:bg-red-100', o:'bg-orange-50 text-orange-600 group-hover:bg-orange-100', a:'bg-amber-50 text-amber-600 group-hover:bg-amber-100', e:'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100', s:'bg-slate-100 text-slate-700 group-hover:bg-slate-200'}[cTheme];
-                return `<td class="py-2 px-1 text-center relative group cursor-pointer" title="Klik salin resi"><span class="group-hover:opacity-0 transition-opacity inline-flex items-center justify-center min-w-[2rem] px-1.5 py-1 rounded font-bold text-[10px] ${tc}">${count.toLocaleString('id-ID')}</span>${btnCopyTpl(containerId, k)}</td>`;
+                if (count === 0) return `<td class="py-1.5 px-1 text-center"><span class="text-slate-300 font-medium">-</span></td>`;
+                const tc = {r:'bg-red-50 text-red-600 group-hover:bg-red-100', o:'bg-orange-50 text-orange-600 group-hover:bg-orange-100', a:'bg-amber-50 text-amber-600 group-hover:bg-amber-100', e:'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100', s:'bg-slate-100 text-slate-800 group-hover:bg-slate-200'}[cTheme];
+                return `<td class="py-1.5 px-1 text-center relative group cursor-pointer" title="Klik salin resi"><span class="group-hover:opacity-0 transition-opacity inline-flex items-center justify-center min-w-[1.75rem] px-1.5 py-0.5 rounded font-bold text-[10px] ${tc}">${count.toLocaleString('id-ID')}</span>${btnCopyTpl(containerId, k)}</td>`;
             };
 
-            if (rowData.length === 0) { html += `<tr><td colspan="${isMultiCol ? 8 : (hideSafeSla ? 6 : 7)}" class="py-6 text-center text-slate-400 italic">Tidak ada data.</td></tr>`; } 
-            else {
+            if (rowData.length === 0) {
+                html += `<tr><td colspan="${isMultiCol ? 8 : (hideSafeSla ? 6 : 7)}" class="py-6 text-center text-slate-400 italic">Tidak ada data.</td></tr>`;
+            } else {
                 let rIdx = 0, rendP0 = {};
                 for (const r of rowData) {
                     gTotalAwbs["After EDD"].push(...r.a); gTotalAwbs["Last Day"].push(...r.l); gTotalAwbs["Nextday"].push(...r.n); gTotalAwbs[">2 Hari"].push(...r.m); gTotalAwbs["Total"].push(...r.t);
@@ -619,59 +768,69 @@
                     let isNewGroup = isMultiCol && !rendP0[r.p0];
                     if (isMultiCol) {
                         if (isNewGroup) { 
-                            tds += `<td class="py-2 px-3 font-bold text-slate-900 align-middle border-r-2 border-slate-300 bg-slate-100/50" rowspan="${rowSpans[r.p0]}">${r.p0}</td>`; 
+                            tds += `<td class="py-1.5 px-2.5 font-bold text-slate-900 align-middle border-r-2 border-slate-300 bg-slate-100/60" rowspan="${rowSpans[r.p0]}">${r.p0}</td>`; 
                             rendP0[r.p0] = true; 
                         }
-                        tds += `<td class="py-2 px-3 font-medium text-slate-700 truncate max-w-[120px] bg-slate-50/30" title="${r.p1}">${r.p1}</td>`;
+                        tds += `<td class="py-1.5 px-2.5 font-medium text-slate-700 truncate max-w-[120px] bg-white" title="${r.p1}">${r.p1}</td>`;
                     } else { 
-                        tds = `<td class="py-2 px-3 font-semibold text-slate-900 truncate max-w-[120px] bg-white">${r.p0}</td>`; 
+                        tds = `<td class="py-1.5 px-2.5 font-semibold text-slate-900 truncate max-w-[120px] bg-white">${r.p0}</td>`; 
                     }
                     
                     let pct = '-';
                     let pctColorClass = "text-slate-400 font-medium";
                     
                     if (hideSafeSla) {
-                        // Untuk Origin Hub: Persentase (Urgent / Grand Total Keseluruhan)
                         if (grandTrueTotal > 0) {
                             let pctVal = (r.t.length / grandTrueTotal) * 100;
                             pct = pctVal.toFixed(2).replace('.', ',') + '%';
                         }
-                        pctColorClass = "text-slate-600 font-bold";
+                        pctColorClass = "text-slate-800 font-extrabold";
                     } else {
-                        // Untuk Estimasi & Produk: % SLA MAX
                         let rowSafeTot = r.n.length + r.trueMor.length;
                         if (r.trueTot > 0) {
                             let pctVal = (rowSafeTot / r.trueTot) * 100;
                             pct = pctVal.toFixed(2).replace('.', ',') + '%';
-                            pctColorClass = pctVal < 98 ? "text-red-600 font-bold" : "text-emerald-600 font-bold";
+                            pctColorClass = pctVal < 98 ? "text-red-600 font-extrabold" : "text-emerald-600 font-extrabold";
                         }
                     }
                     
                     let rowBorderClass = (isNewGroup && rIdx > 0) ? '!border-t-[3px] !border-t-slate-300' : 'border-b border-transparent';
                     
-                    html += `<tr class="hover:bg-slate-50 transition-colors ${rowBorderClass}">${tds}${mCell(`r${rIdx}_a`, r.a.length, 'r')}${mCell(`r${rIdx}_l`, r.l.length, 'o')}${mCell(`r${rIdx}_s`, r.n.length, 'a')}${hideSafeSla ? '' : mCell(`r${rIdx}_m`, r.m.length, 'e')}${mCell(`r${rIdx}_t`, r.t.length, 's')}<td class="py-2 px-2 text-center text-[11px] ${pctColorClass}">${pct}</td></tr>`;
+                    let totalCellContent = '';
+                    if (hideSafeSla) {
+                        totalCellContent = `<td class="py-1.5 px-1 text-center relative group cursor-pointer" title="Klik salin resi urgent">
+                            <span class="group-hover:opacity-0 transition-opacity flex flex-col items-center justify-center text-[10px]">
+                                <span class="font-extrabold text-slate-900 leading-tight">${r.t.length.toLocaleString('id-ID')}</span>
+                                <span class="border-t border-slate-300 w-4 my-0.5"></span>
+                                <span class="font-semibold text-slate-500 text-[9px] leading-tight">${r.trueTot.toLocaleString('id-ID')}</span>
+                            </span>
+                            ${btnCopyTpl(containerId, `r${rIdx}_t`)}
+                        </td>`;
+                    } else {
+                        totalCellContent = mCell(`r${rIdx}_t`, r.t.length, 's');
+                    }
+                    
+                    html += `<tr class="hover:bg-slate-50 transition-colors ${rowBorderClass}">${tds}${mCell(`r${rIdx}_a`, r.a.length, 'r')}${mCell(`r${rIdx}_l`, r.l.length, 'o')}${mCell(`r${rIdx}_s`, r.n.length, 'a')}${hideSafeSla ? '' : mCell(`r${rIdx}_m`, r.m.length, 'e')}${totalCellContent}<td class="py-1.5 px-2 text-center text-[10px] ${pctColorClass}">${pct}</td></tr>`;
                     rIdx++;
                 }
             }
             Object.assign(window.tableAwbs[containerId], gTotalAwbs);
             
             const mFoot = (cat, tClass) => {
-                const c = gTotals[cat]; if (c === 0) return `<td class="py-3 px-1 text-center text-slate-400">-</td>`;
-                return `<td class="py-3 px-1 text-center relative group cursor-pointer" title="Salin semua ${cat}"><span class="group-hover:opacity-0 transition-opacity block font-extrabold text-[11px] ${tClass}">${c.toLocaleString('id-ID')}</span>${btnCopyTpl(containerId, cat)}</td>`;
+                const c = gTotals[cat]; if (c === 0) return `<td class="py-2.5 px-1 text-center text-slate-400">-</td>`;
+                return `<td class="py-2.5 px-1 text-center relative group cursor-pointer" title="Salin semua ${cat}"><span class="group-hover:opacity-0 transition-opacity block font-extrabold text-[10px] ${tClass}">${c.toLocaleString('id-ID')}</span>${btnCopyTpl(containerId, cat)}</td>`;
             };
             
             let fPct = '-';
             let fPctColorClass = "text-slate-400";
             
             if (hideSafeSla) {
-                // Footer Origin Hub: (Total Seluruh Urgent / Grand Total Keseluruhan)
                 if (grandTrueTotal > 0) {
                     let fPctVal = (gTotals["Total"] / grandTrueTotal) * 100;
                     fPct = fPctVal.toFixed(2).replace('.', ',') + '%';
                 }
                 fPctColorClass = "text-slate-800 font-extrabold";
             } else {
-                // Footer Estimasi & Produk: Total % SLA MAX
                 let fSafeTot = gTotals["Nextday"] + gTotals["TrueMor"];
                 if (gTotals["TrueTotal"] > 0) {
                     let fPctVal = (fSafeTot / gTotals["TrueTotal"]) * 100;
@@ -680,10 +839,24 @@
                 }
             }
 
-            html += `</tbody><tfoot class="bg-slate-50 border-t-2 border-slate-200 sticky bottom-0 z-20 shadow-inner"><tr>
-                        <td class="py-3 px-3 font-bold text-slate-700 uppercase text-[10px]" colspan="${isMultiCol ? 2 : 1}">Total</td>
-                        ${mFoot("After EDD", "text-red-600")}${mFoot("Last Day", "text-orange-600")}${mFoot("Nextday", "text-amber-600")}${hideSafeSla ? '' : mFoot(">2 Hari", "text-emerald-600")}${mFoot("Total", "text-slate-800")}
-                        <td class="py-3 px-2 text-center text-[11px] ${fPctColorClass}">${fPct}</td>
+            let footerTotalContent = '';
+            if (hideSafeSla) {
+                footerTotalContent = `<td class="py-2.5 px-1 text-center relative group cursor-pointer" title="Salin semua total urgent">
+                    <span class="group-hover:opacity-0 transition-opacity flex flex-col items-center justify-center text-[10px]">
+                        <span class="font-extrabold text-slate-900 leading-tight">${gTotals["Total"].toLocaleString('id-ID')}</span>
+                        <span class="border-t border-slate-400 w-5 my-0.5"></span>
+                        <span class="font-bold text-slate-600 text-[9px] leading-tight">${gTotals["TrueTotal"].toLocaleString('id-ID')}</span>
+                    </span>
+                    ${btnCopyTpl(containerId, 'Total')}
+                </td>`;
+            } else {
+                footerTotalContent = mFoot("Total", "text-slate-900");
+            }
+
+            html += `</tbody><tfoot class="bg-slate-100 border-t-2 border-slate-300 sticky bottom-0 z-20 shadow-inner"><tr>
+                        <td class="py-2.5 px-2.5 font-bold text-slate-800 uppercase text-[10px]" colspan="${isMultiCol ? 2 : 1}">Total</td>
+                        ${mFoot("After EDD", "text-red-600")}${mFoot("Last Day", "text-orange-600")}${mFoot("Nextday", "text-amber-600")}${hideSafeSla ? '' : mFoot(">2 Hari", "text-emerald-600")}${footerTotalContent}
+                        <td class="py-2.5 px-2 text-center text-[10px] ${fPctColorClass}">${fPct}</td>
                     </tr></tfoot></table></div>`;
             container.innerHTML = html;
         }
@@ -698,24 +871,24 @@
             window.currentContainerList[containerId] = allContainersText;
 
             let html = `
-                <div class="p-2 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
-                    <h2 class="text-[11px] font-extrabold text-slate-800">${title}</h2>
-                    ${sortedData.length > 0 ? `<button onclick="copyToClipboard(window.currentContainerList['${containerId}'], this)" class="text-[9px] bg-white hover:bg-slate-100 text-slate-600 font-bold px-2 py-0.5 rounded border shadow-sm transition-all flex items-center gap-1">📋 Salin Container</button>` : ''}
+                <div class="p-3 border-b border-slate-200 bg-slate-50/50 flex justify-between items-center">
+                    <h2 class="text-xs font-extrabold text-slate-800">${title}</h2>
+                    ${sortedData.length > 0 ? `<button onclick="copyToClipboard(window.currentContainerList['${containerId}'], this)" class="text-[10px] bg-white hover:bg-slate-100 text-slate-700 font-bold px-2.5 py-1 rounded-lg border border-slate-300 shadow-sm transition-all flex items-center gap-1">📋 Salin Container</button>` : ''}
                 </div>
-                <div class="overflow-y-auto custom-scrollbar relative">
+                <div class="overflow-x-auto custom-scrollbar relative">
                     <table class="w-full text-left text-[10px] text-slate-600">
-                        <thead class="bg-white/95 backdrop-blur text-[9px] text-slate-500 uppercase border-b border-slate-200 sticky top-0 z-20">
+                        <thead class="bg-slate-100/90 backdrop-blur text-[9px] text-slate-500 uppercase border-b border-slate-200 sticky top-0 z-20">
                             <tr>
-                                <th class="py-1.5 px-2 font-bold">No. Container</th>
-                                <th class="py-1.5 px-1 text-center font-bold text-slate-700">Isi</th>
-                                <th class="py-1.5 px-1 text-center font-bold text-red-500"><0</th>
-                                <th class="py-1.5 px-1 text-center font-bold text-brand-500">0</th>
-                                <th class="py-1.5 px-1 text-center font-bold text-brand-500">1</th>
-                                <th class="py-1.5 px-1 text-center font-bold text-brand-500">2</th>
-                                <th class="py-1.5 px-1 text-center font-bold text-brand-500">3</th>
-                                <th class="py-1.5 px-1 text-center font-bold text-brand-500">4</th>
-                                <th class="py-1.5 px-1 text-center font-bold text-brand-500">>4</th>
-                                <th class="py-1.5 px-1 text-center font-bold text-slate-700">Total</th>
+                                <th class="py-2 px-2 font-bold">No. Container</th>
+                                <th class="py-2 px-1 text-center font-bold text-slate-700">Isi</th>
+                                <th class="py-2 px-1 text-center font-bold text-red-600">&lt;0</th>
+                                <th class="py-2 px-1 text-center font-bold text-brand-600">0</th>
+                                <th class="py-2 px-1 text-center font-bold text-brand-600">1</th>
+                                <th class="py-2 px-1 text-center font-bold text-brand-600">2</th>
+                                <th class="py-2 px-1 text-center font-bold text-brand-600">3</th>
+                                <th class="py-2 px-1 text-center font-bold text-brand-600">4</th>
+                                <th class="py-2 px-1 text-center font-bold text-brand-600">&gt;4</th>
+                                <th class="py-2 px-1 text-center font-bold text-slate-800">Total</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
@@ -726,10 +899,10 @@
             const mCCell = (key, count, cTheme) => {
                 if (count === 0) return `<td class="py-1 px-1 text-center"><span class="text-slate-300">-</span></td>`;
                 const bg = cTheme==='r' ? 'bg-red-50 text-red-600' : cTheme==='t' ? 'bg-slate-100 text-slate-800' : 'bg-brand-50 text-brand-700';
-                return `<td class="py-1 px-1 text-center relative group cursor-pointer"><span class="group-hover:opacity-0 transition-opacity flex justify-center min-w-[1.25rem] px-1 py-0.5 rounded font-bold text-[9px] ${bg}">${count.toLocaleString('id-ID')}</span>${btnCopyTpl(containerId, key)}</td>`;
+                return `<td class="py-1 px-1 text-center relative group cursor-pointer"><span class="group-hover:opacity-0 transition-opacity inline-flex justify-center min-w-[1.25rem] px-1 py-0.5 rounded font-bold text-[9px] ${bg}">${count.toLocaleString('id-ID')}</span>${btnCopyTpl(containerId, key)}</td>`;
             };
 
-            if (sortedData.length === 0) { html += `<tr><td colspan="10" class="py-4 text-center italic">Tidak ada Container target.</td></tr>`; } 
+            if (sortedData.length === 0) { html += `<tr><td colspan="10" class="py-4 text-center italic text-slate-400">Tidak ada Container target.</td></tr>`; } 
             else {
                 let rIdx = 0;
                 for (const [cN, inf] of sortedData) {
@@ -743,7 +916,7 @@
                     window.tableAwbs[containerId][`r${rIdx}_<0`] = aL; window.tableAwbs[containerId][`r${rIdx}_0`] = a0; window.tableAwbs[containerId][`r${rIdx}_1`] = a1; window.tableAwbs[containerId][`r${rIdx}_2`] = a2; window.tableAwbs[containerId][`r${rIdx}_3`] = a3; window.tableAwbs[containerId][`r${rIdx}_4`] = a4; window.tableAwbs[containerId][`r${rIdx}_>4`] = aM; window.tableAwbs[containerId][`r${rIdx}_Total`] = tA;
                     
                     html += `<tr class="hover:bg-slate-50 transition-colors">
-                                <td class="py-1 px-2 font-semibold text-slate-800 group/r flex justify-between"><span class="font-mono text-[9px]">${cN}</span><button onclick="copyToClipboard('${cN}', this)" class="text-slate-300 hover:text-brand-600 opacity-0 group-hover/r:opacity-100">📋</button></td>
+                                <td class="py-1 px-2 font-semibold text-slate-800 group/r flex items-center justify-between"><span class="font-mono text-[9px]">${cN}</span><button onclick="copyToClipboard('${cN}', this)" class="text-slate-400 hover:text-brand-600 opacity-0 group-hover/r:opacity-100 transition-opacity">📋</button></td>
                                 <td class="py-1 px-1 text-center font-bold text-slate-500 bg-slate-50/50">${inf.total.toLocaleString('id-ID')}</td>
                                 ${mCCell(`r${rIdx}_<0`, aL.length, 'r')}${mCCell(`r${rIdx}_0`, a0.length, 'b')}${mCCell(`r${rIdx}_1`, a1.length, 'b')}${mCCell(`r${rIdx}_2`, a2.length, 'b')}${mCCell(`r${rIdx}_3`, a3.length, 'b')}${mCCell(`r${rIdx}_4`, a4.length, 'b')}${mCCell(`r${rIdx}_>4`, aM.length, 'b')}${mCCell(`r${rIdx}_Total`, tA.length, 't')}
                              </tr>`;
@@ -754,7 +927,7 @@
             
             const mCFoot = (cat, tClass) => {
                 const c = ctTot[cat]; if (c === 0) return `<td class="py-2 px-1 text-center text-slate-400">-</td>`;
-                return `<td class="py-2 px-1 text-center relative group cursor-pointer"><span class="group-hover:opacity-0 transition-opacity block font-extrabold text-[10px] ${tClass}">${c.toLocaleString('id-ID')}</span>${btnCopyTpl(containerId, cat)}</td>`;
+                return `<td class="py-2 px-1 text-center relative group cursor-pointer"><span class="group-hover:opacity-0 transition-opacity block font-extrabold text-[9px] ${tClass}">${c.toLocaleString('id-ID')}</span>${btnCopyTpl(containerId, cat)}</td>`;
             };
 
             html += `</tbody><tfoot class="bg-slate-100 border-t border-slate-200 sticky bottom-0 z-20"><tr>
@@ -769,15 +942,15 @@
             const container = document.getElementById(containerId);
             window.tableAwbs[containerId] = {};
             const sCols = [...fopColumns].sort();
-            let thCols = sCols.map(c => `<th class="py-1.5 px-2 text-center font-bold text-brand-600">${c}</th>`).join('');
+            let thCols = sCols.map(c => `<th class="py-2 px-2 text-center font-bold text-brand-600">${c}</th>`).join('');
             let html = `
-                <div class="p-2 border-b border-slate-200 bg-slate-50 flex items-center">
-                    <h2 class="text-[11px] font-extrabold text-slate-800 flex items-center gap-1.5"><span class="text-brand-500">📈</span> ${title}</h2>
+                <div class="p-3 border-b border-slate-200 bg-slate-50/50 flex items-center">
+                    <h2 class="text-xs font-extrabold text-slate-800 flex items-center gap-1.5"><span class="text-brand-500">📈</span> ${title}</h2>
                 </div>
                 <div class="overflow-x-auto custom-scrollbar">
                     <table class="w-full text-left text-[10px] text-slate-600 relative">
-                        <thead class="bg-white/95 backdrop-blur text-[9px] text-slate-500 uppercase border-b border-slate-200 sticky top-0 z-10">
-                            <tr><th class="py-1.5 px-2 font-bold border-r border-slate-200">Tujuan</th>${thCols}<th class="py-1.5 px-2 text-center font-bold text-slate-700 bg-slate-100/50">Total</th></tr>
+                        <thead class="bg-slate-100/90 backdrop-blur text-[9px] text-slate-500 uppercase border-b border-slate-200 sticky top-0 z-10">
+                            <tr><th class="py-2 px-2 font-bold border-r border-slate-200">Hub Tujuan</th>${thCols}<th class="py-2 px-2 text-center font-bold text-slate-800 bg-slate-100/50">Total</th></tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
             `;
@@ -790,7 +963,7 @@
                 return { h: hub, c: rC, t: rTA.length, tA: rTA };
             }).sort((a,b) => ({'MKS':1,'BPP':2,'BJM':3,'PLK':4,'MND':5,'PAL':6,'KDI':7,'TAR':8,'Gateway':9}[a.h]||99) - ({'MKS':1,'BPP':2,'BJM':3,'PLK':4,'MND':5,'PAL':6,'KDI':7,'TAR':8,'Gateway':9}[b.h]||99));
             
-            if (rData.length === 0) { html += `<tr><td colspan="${sCols.length + 2}" class="py-4 text-center italic">Tidak ada data.</td></tr>`; } 
+            if (rData.length === 0) { html += `<tr><td colspan="${sCols.length + 2}" class="py-4 text-center italic text-slate-400">Tidak ada data FOP.</td></tr>`; } 
             else {
                 let rIdx = 0;
                 for (const r of rData) {
@@ -799,11 +972,11 @@
                         const cell = r.c[c]; gT[c] += cell.cnt; gTAwbs[c] = gTAwbs[c].concat(cell.a);
                         window.tableAwbs[containerId][`r${rIdx}_${c}`] = cell.a;
                         if (cell.cnt === 0) { html += `<td class="py-1 px-1 text-center text-slate-300">-</td>`; }
-                        else { html += `<td class="py-1 px-1 text-center relative group cursor-pointer"><span class="group-hover:opacity-0 transition-opacity flex justify-center min-w-[1.25rem] px-1 py-0.5 rounded font-bold text-[9px] bg-brand-50 text-brand-700">${cell.cnt.toLocaleString('id-ID')}</span>${btnCopyTpl(containerId, `r${rIdx}_${c}`)}</td>`; }
+                        else { html += `<td class="py-1 px-1 text-center relative group cursor-pointer"><span class="group-hover:opacity-0 transition-opacity inline-flex justify-center min-w-[1.25rem] px-1 py-0.5 rounded font-bold text-[9px] bg-brand-50 text-brand-700">${cell.cnt.toLocaleString('id-ID')}</span>${btnCopyTpl(containerId, `r${rIdx}_${c}`)}</td>`; }
                     });
                     gT.Total += r.t; gTAwbs.Total = gTAwbs.Total.concat(r.tA); window.tableAwbs[containerId][`r${rIdx}_Total`] = r.tA;
                     if (r.t === 0) { html += `<td class="py-1 px-2 text-center text-slate-400 bg-slate-50/50">-</td></tr>`; }
-                    else { html += `<td class="py-1 px-2 text-center relative group cursor-pointer bg-slate-50/50"><span class="group-hover:opacity-0 transition-opacity flex justify-center min-w-[1.5rem] px-1 py-0.5 rounded font-extrabold text-[10px] bg-slate-200 text-slate-800">${r.t.toLocaleString('id-ID')}</span>${btnCopyTpl(containerId, `r${rIdx}_Total`)}</td></tr>`; }
+                    else { html += `<td class="py-1 px-2 text-center relative group cursor-pointer bg-slate-50/50"><span class="group-hover:opacity-0 transition-opacity inline-flex justify-center min-w-[1.5rem] px-1 py-0.5 rounded font-extrabold text-[10px] bg-slate-200 text-slate-800">${r.t.toLocaleString('id-ID')}</span>${btnCopyTpl(containerId, `r${rIdx}_Total`)}</td></tr>`; }
                     rIdx++;
                 }
             }
@@ -811,7 +984,7 @@
             
             const mTFoot = (cat, isT) => {
                 const c = gT[cat]; if (c === 0) return `<td class="py-2 px-1 text-center text-slate-400">-</td>`;
-                const tc = isT ? 'text-slate-800' : 'text-brand-600';
+                const tc = isT ? 'text-slate-900' : 'text-brand-600';
                 return `<td class="py-2 px-1 text-center relative group cursor-pointer"><span class="group-hover:opacity-0 transition-opacity block font-extrabold text-[10px] ${tc}">${c.toLocaleString('id-ID')}</span>${btnCopyTpl(containerId, cat)}</td>`;
             };
             
@@ -822,17 +995,23 @@
             container.innerHTML = html;
         }
 
+        // Action: Screenshot Dashboard Export
         document.getElementById('screenshotBtn').addEventListener('click', async () => {
             const btn = document.getElementById('screenshotBtn');
             const originalHTML = btn.innerHTML;
-            btn.innerHTML = 'Memproses...';
+            btn.innerHTML = '<span>⏳</span> Processing...';
             try {
                 const canvas = await html2canvas(document.getElementById('dashboardContent'), { scale: 2, backgroundColor: "#f8fafc" });
                 const link = document.createElement('a');
-                link.download = `SLA-Container-${new Date().toISOString().slice(0,10)}.png`;
+                link.download = `SLA-Dashboard-${new Date().toISOString().slice(0,10)}.png`;
                 link.href = canvas.toDataURL('image/png'); link.click();
-                btn.innerHTML = '✓ Diunduh'; setTimeout(() => btn.innerHTML = originalHTML, 3000);
-            } catch (err) { alert('Gagal memproses gambar.'); btn.innerHTML = originalHTML; }
+                btn.innerHTML = '<span>✓</span> Diunduh!'; 
+                showToast('Screenshot dashboard berhasil diunduh!');
+                setTimeout(() => btn.innerHTML = originalHTML, 2500);
+            } catch (err) { 
+                showToast('Gagal memproses gambar screenshot.', 'error');
+                btn.innerHTML = originalHTML; 
+            }
         });
     </script>
 </body>
